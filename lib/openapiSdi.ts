@@ -240,7 +240,7 @@ export async function buildInvoiceData(orderId: string): Promise<InvoiceData | n
     sdiCode: order.user.billingProfile?.sdiCode || undefined,
     address: {
       addressLine1: order.user.billingProfile?.addressLine1 || 'Indirizzo non specificato',
-      addressLine2: order.user.billingProfile?.addressLine2,
+      addressLine2: order.user.billingProfile?.addressLine2 || undefined,
       city: order.user.billingProfile?.city || 'Città non specificata',
       province: order.user.billingProfile?.province || '',
       postalCode: order.user.billingProfile?.postalCode || '00000',

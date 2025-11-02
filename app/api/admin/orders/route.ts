@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     const statsMap = stats.reduce((acc, stat) => {
       acc[stat.invoiceStatus] = {
         count: stat._count.id,
-        total: stat._sum.totalPrice || 0,
+        total: stat._sum.totalPrice ? Number(stat._sum.totalPrice) : 0,
       };
       return acc;
     }, {} as Record<string, { count: number; total: number }>);

@@ -148,7 +148,7 @@ export default function CustomersPage() {
     setPage(1); // Resetta alla prima pagina
   };
 
-  const handleFilter = (filter: string) => {
+  const handleFilter = (filter: string | null) => {
     setIsBusinessFilter(filter === isBusinessFilter ? null : filter);
     setPage(1); // Resetta alla prima pagina
   };

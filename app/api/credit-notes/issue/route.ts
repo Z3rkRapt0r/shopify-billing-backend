@@ -131,16 +131,6 @@ export async function GET(request: NextRequest) {
     const [creditNotes, total] = await Promise.all([
       prisma.creditNote.findMany({
         where,
-        include: {
-          // Non c'è una relazione diretta, ma possiamo includere l'ordine
-          // Ordine: {
-          //   select: {
-          //     shopifyOrderId: true,
-          //     orderNumber: true,
-          //     totalPrice: true,
-          //   },
-          // },
-        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,

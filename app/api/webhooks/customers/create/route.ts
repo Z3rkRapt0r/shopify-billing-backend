@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Se l'utente ha un indirizzo italiano, crea/aggiorna il billing profile
-    const primaryAddress = webhookData.addresses?.[0];
+    const primaryAddress = webhookData.addresses?.[0] as any;
     if (primaryAddress && primaryAddress.country_code === 'IT') {
       const billingProfileData = {
         companyName: primaryAddress.company || undefined,

@@ -190,7 +190,7 @@ export default function OrdersPage() {
     setPage(1); // Resetta alla prima pagina
   };
 
-  const handleFilter = (filter: string) => {
+  const handleFilter = (filter: string | null) => {
     setStatusFilter(filter === statusFilter ? null : filter);
     setPage(1); // Resetta alla prima pagina
   };

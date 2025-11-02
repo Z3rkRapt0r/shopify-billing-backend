@@ -175,23 +175,23 @@ export async function GET(request: NextRequest) {
       foreignOrders,
       
       // Revenue
-      totalRevenue: totalRevenue._sum.totalPrice || 0,
-      pendingRevenue: pendingRevenue._sum.totalPrice || 0,
-      issuedRevenue: issuedRevenue._sum.totalPrice || 0,
-      errorRevenue: errorRevenue._sum.totalPrice || 0,
-      foreignRevenue: foreignRevenue._sum.totalPrice || 0,
+      totalRevenue: totalRevenue._sum.totalPrice ? Number(totalRevenue._sum.totalPrice) : 0,
+      pendingRevenue: pendingRevenue._sum.totalPrice ? Number(pendingRevenue._sum.totalPrice) : 0,
+      issuedRevenue: issuedRevenue._sum.totalPrice ? Number(issuedRevenue._sum.totalPrice) : 0,
+      errorRevenue: errorRevenue._sum.totalPrice ? Number(errorRevenue._sum.totalPrice) : 0,
+      foreignRevenue: foreignRevenue._sum.totalPrice ? Number(foreignRevenue._sum.totalPrice) : 0,
       
       // Statistiche dettagliate
       statusStats: statusStats.reduce((acc, stat) => {
         acc[stat.invoiceStatus] = {
           count: stat._count.id,
-          revenue: stat._sum.totalPrice || 0,
+          revenue: stat._sum.totalPrice ? Number(stat._sum.totalPrice) : 0,
         };
         return acc;
       }, {} as Record<string, { count: number; revenue: number }>),
       
       // Statistiche mensili
-      monthlyStats: monthlyStats.map((stat: any) => ({
+      monthlyStats: (monthlyStats as any[]).map((stat: any) => ({
         month: stat.month,
         ordersCount: parseInt(stat.orders_count),
         revenue: parseFloat(stat.revenue),
