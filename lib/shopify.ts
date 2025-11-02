@@ -8,7 +8,7 @@ const SHOPIFY_API_VERSION = '2024-01';
 export function verifyShopifyWebhook(body: string, shopifyHmac: string): boolean {
   const secret = process.env.SHOPIFY_API_SECRET;
   if (!secret) {
-    console.error('SHOPIFY_API_SECRET non configurato');
+    console.error('❌ SHOPIFY_API_SECRET non configurato');
     return false;
   }
 
@@ -17,7 +17,18 @@ export function verifyShopifyWebhook(body: string, shopifyHmac: string): boolean
     .update(body, 'utf8')
     .digest('base64');
 
-  return crypto.timingSafeEqual(Buffer.from(shopifyHmac), Buffer.from(computedHmac));
+  const isValid = crypto.timingSafeEqual(Buffer.from(shopifyHmac), Buffer.from(computedHmac));
+  
+  if (!isValid) {
+    console.error('❌ HMAC Verification Failed:');
+    console.error(`   Received HMAC: ${shopifyHmac.substring(0, 20)}...`);
+    console.error(`   Computed HMAC: ${computedHmac.substring(0, 20)}...`);
+    console.error(`   Secret configured: ${secret ? 'Yes (length: ' + secret.length + ')' : 'No'}`);
+  } else {
+    console.log('✅ HMAC Verification Success');
+  }
+
+  return isValid;
 }
 
 // Client per Admin API di Shopify
