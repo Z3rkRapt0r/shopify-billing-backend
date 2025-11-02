@@ -13,7 +13,7 @@
   "crons": [
     {
       "path": "/api/cron/retry-pending",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 2 * * *"
     }
   ],
   "env": {

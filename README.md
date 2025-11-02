@@ -174,6 +174,11 @@ Per embeddare il form di fatturazione nel tuo storefront:
 
 - `GET /api/cron/retry-pending` - Retry automatico fatture fallite
 
+**Nota importante per piano Hobby:**
+- Su piano Vercel Hobby, il cron job viene eseguito una volta al giorno alle 2:00 AM
+- L'esecuzione potrebbe avvenire in un'ora qualsiasi tra le 2:00 e le 2:59 AM
+- Per esecuzioni più frequenti o precise, è necessario upgrade al piano Pro
+
 ## Flusso di Fatturazione
 
 1. **Cliente crea account** → Webhook `customers/create`
