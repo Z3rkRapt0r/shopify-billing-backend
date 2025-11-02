@@ -18,13 +18,18 @@ export async function POST(request: NextRequest) {
     const { limit = 50, since_id } = body;
 
     const shopifyClient = createShopifyClient();
-    let syncedCount = 0;
+    let syncedCount = 0; // Clienti Business sincronizzati
+    let processedCount = 0; // Clienti totali processati
+    let skippedCount = 0; // Clienti privati saltati
     let hasMore = true;
     let lastCustomerId = since_id;
 
-    while (hasMore && syncedCount < limit) {
+    // Funzione helper per delay (evita 429)
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    while (hasMore && processedCount < limit) {
       const response = await shopifyClient.getCustomers({
-        limit: Math.min(50, limit - syncedCount),
+        limit: Math.min(50, limit - processedCount),
         since_id: lastCustomerId,
       });
 
@@ -37,6 +42,9 @@ export async function POST(request: NextRequest) {
 
       for (const customer of customers) {
         try {
+          // Delay di 300ms tra le chiamate per evitare 429 (max 3 richieste/secondo)
+          await delay(300);
+          
           // Recupera metafields del cliente
           const metafieldsResponse = await shopifyClient.getCustomerMetafields(customer.id.toString());
           const metafields = metafieldsResponse.metafields || [];
@@ -45,7 +53,16 @@ export async function POST(request: NextRequest) {
           const billingData = extractBillingDataFromMetafields(metafields);
           const isBusiness = isBusinessCustomer(metafields);
           
-          // Upsert utente
+          // IMPORTANTE: Sincronizza SOLO i clienti Business
+          if (!isBusiness) {
+            console.log(`⏭️  Skipping private customer: ${customer.email} (no business metafields)`);
+            skippedCount++;
+            processedCount++;
+            lastCustomerId = customer.id.toString();
+            continue;
+          }
+
+          // Cliente Business - sincronizza
           const user = await prisma.user.upsert({
             where: {
               shopifyCustomerId: customer.id.toString(),
@@ -65,54 +82,59 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          // Se il cliente è Business (ha metafields compilati), crea/aggiorna billing profile
-          if (isBusiness && billingData) {
-            const primaryAddress = customer.addresses?.[0];
-            
-            const billingProfileData = {
-              companyName: billingData.ragioneSociale || undefined,
-              vatNumber: billingData.partitaIva || undefined,
-              taxCode: billingData.codiceFiscale || undefined,
-              sdiCode: billingData.codiceSdi || undefined,
-              addressLine1: primaryAddress?.address1 || undefined,
-              addressLine2: primaryAddress?.address2 || undefined,
-              city: primaryAddress?.city || undefined,
-              province: primaryAddress?.province || undefined,
-              postalCode: primaryAddress?.zip || undefined,
-              countryCode: primaryAddress?.country_code || 'IT',
-              isBusiness: true,
-            };
-
-            const validatedData = billingProfileSchema.parse(billingProfileData);
-
-            await prisma.billingProfile.upsert({
-              where: {
-                userId: user.id,
-              },
-              update: validatedData,
-              create: {
-                userId: user.id,
-                ...validatedData,
-              },
-            });
-            
-            console.log(`✅ Synced business customer: ${customer.email} (${billingData.ragioneSociale || billingData.partitaIva})`);
-          } else {
-            console.log(`ℹ️  Synced regular customer: ${customer.email}`);
+          const primaryAddress = customer.addresses?.[0];
+          
+          // TypeScript safety: billingData è garantito non-null qui
+          if (!billingData) {
+            console.error(`Unexpected: billingData is null for business customer ${customer.id}`);
+            continue;
           }
+          
+          const billingProfileData = {
+            companyName: billingData.ragioneSociale || undefined,
+            vatNumber: billingData.partitaIva || undefined,
+            taxCode: billingData.codiceFiscale || undefined,
+            sdiCode: billingData.codiceSdi || undefined,
+            addressLine1: primaryAddress?.address1 || undefined,
+            addressLine2: primaryAddress?.address2 || undefined,
+            city: primaryAddress?.city || undefined,
+            province: primaryAddress?.province || undefined,
+            postalCode: primaryAddress?.zip || undefined,
+            countryCode: primaryAddress?.country_code || 'IT',
+            isBusiness: true,
+          };
 
+          const validatedData = billingProfileSchema.parse(billingProfileData);
+
+          await prisma.billingProfile.upsert({
+            where: {
+              userId: user.id,
+            },
+            update: validatedData,
+            create: {
+              userId: user.id,
+              ...validatedData,
+            },
+          });
+          
+          console.log(`✅ Synced business customer: ${customer.email} (${billingData.ragioneSociale || billingData.partitaIva})`);
           syncedCount++;
+          processedCount++;
           lastCustomerId = customer.id.toString();
         } catch (error) {
           console.error(`Error syncing customer ${customer.id}:`, error);
+          processedCount++;
+          lastCustomerId = customer.id.toString();
         }
       }
     }
 
-    console.log(`Synced ${syncedCount} customers from Shopify`);
+    console.log(`Processed ${processedCount} customers: ${syncedCount} Business synced, ${skippedCount} private skipped`);
     return NextResponse.json({
       success: true,
-      syncedCount,
+      syncedCount, // Clienti Business sincronizzati
+      processedCount, // Totale clienti processati
+      skippedCount, // Clienti privati saltati
       lastCustomerId,
       hasMore,
     });

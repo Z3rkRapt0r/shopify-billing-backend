@@ -109,7 +109,12 @@ export default function CustomersPage() {
       }
 
       const data = await response.json();
-      alert(`Sincronizzati ${data.syncedCount} clienti da Shopify`);
+      alert(
+        `✅ Sincronizzazione completata!\n\n` +
+        `📊 Clienti processati: ${data.processedCount}\n` +
+        `✅ Clienti Business sincronizzati: ${data.syncedCount}\n` +
+        `⏭️  Clienti privati saltati: ${data.skippedCount}`
+      );
       
       // Ricarica la lista clienti
       loadCustomers();
