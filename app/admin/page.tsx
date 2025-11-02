@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface KpiData {
   totalUsers: number;
@@ -41,6 +43,12 @@ interface Order {
 }
 
 export default function AdminDashboard() {
+  // Stati per autenticazione
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState('');
+
   const [kpiData, setKpiData] = useState<KpiData>({
     totalUsers: 0,
     businessUsers: 0,
@@ -52,22 +60,25 @@ export default function AdminDashboard() {
   });
   
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [issuingInvoice, setIssuingInvoice] = useState<string | null>(null);
 
-  // Carica dati KPI
+  // Carica dati KPI solo dopo autenticazione
   useEffect(() => {
-    loadKpiData();
-    loadRecentOrders();
-  }, []);
+    if (isAuthenticated) {
+      setLoading(true);
+      loadKpiData();
+      loadRecentOrders();
+    }
+  }, [isAuthenticated]);
 
   const loadKpiData = async () => {
     try {
       const response = await fetch('/api/admin/orders/stats', {
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
         },
       });
 
@@ -87,7 +98,7 @@ export default function AdminDashboard() {
     try {
       const response = await fetch('/api/admin/orders?limit=10', {
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
         },
       });
 
@@ -111,7 +122,7 @@ export default function AdminDashboard() {
       const response = await fetch('/api/admin/sync-customers', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ limit: 50 }),
@@ -140,7 +151,7 @@ export default function AdminDashboard() {
       const response = await fetch('/api/invoices/issue', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ shopifyOrderId }),
@@ -165,6 +176,30 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    
+    try {
+      // Testa la password facendo una chiamata API
+      const response = await fetch('/api/admin/orders/stats', {
+        headers: {
+          'Authorization': `Bearer ${passwordInput}`,
+        },
+      });
+
+      if (response.ok) {
+        setAdminPassword(passwordInput);
+        setIsAuthenticated(true);
+        setPasswordInput('');
+      } else {
+        setLoginError('Password non valida');
+      }
+    } catch (err) {
+      setLoginError('Errore di connessione');
+    }
+  };
+
   const getInvoiceStatusBadge = (status: string) => {
     switch (status) {
       case 'ISSUED':
@@ -180,6 +215,42 @@ export default function AdminDashboard() {
     }
   };
 
+  // Mostra il form di login se non autenticato
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Admin Login</CardTitle>
+            <CardDescription>Inserisci la password per accedere al pannello admin</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="password">Password Admin</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Inserisci password"
+                  required
+                />
+              </div>
+              {loginError && (
+                <p className="text-sm text-red-600">{loginError}</p>
+              )}
+              <Button type="submit" className="w-full">
+                Accedi
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Mostra loading solo dopo autenticazione
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
