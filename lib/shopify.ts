@@ -291,6 +291,31 @@ export function isBusinessCustomer(metafields: any[]): boolean {
     return false;
   }
 
-  // Un cliente è Business se ha almeno Partita IVA o Ragione Sociale
-  return !!(billingData.partitaIva || billingData.ragioneSociale);
+  // ⚠️ CRITERIO BUSINESS: TUTTI i metafields devono essere compilati
+  const hasAllFields = !!(
+    billingData.fatturaAutomaticamente !== undefined &&
+    billingData.clienteUE !== undefined &&
+    billingData.codiceSdi &&
+    billingData.codiceFiscale &&
+    billingData.partitaIva &&
+    billingData.ragioneSociale
+  );
+  
+  if (hasAllFields) {
+    console.log(`✅ Cliente Business completo: ${billingData.ragioneSociale} (tutti i metafields presenti)`);
+  } else {
+    const missing = [];
+    if (billingData.fatturaAutomaticamente === undefined) missing.push('Fattura Automaticamente');
+    if (billingData.clienteUE === undefined) missing.push('Cliente UE');
+    if (!billingData.codiceSdi) missing.push('Codice SDI');
+    if (!billingData.codiceFiscale) missing.push('Codice Fiscale');
+    if (!billingData.partitaIva) missing.push('Partita IVA');
+    if (!billingData.ragioneSociale) missing.push('Ragione Sociale');
+    
+    if (missing.length > 0 && missing.length < 6) {
+      console.log(`⚠️  Cliente con metafields incompleti. Mancano: ${missing.join(', ')}`);
+    }
+  }
+  
+  return hasAllFields;
 }
