@@ -181,12 +181,12 @@ export function CustomerDetailDialog({
                   </CardTitle>
                   {customer.billingProfile.source === 'shopify_realtime' && (
                     <p className="text-xs text-green-600 mt-1">
-                      ✓ Dati recuperati in tempo reale dai metafields Shopify
+                      ✓ Dati recuperati in tempo reale dai metafields Shopify e salvati nel database
                     </p>
                   )}
                   {!customer.billingProfile.source && (
-                    <p className="text-xs text-yellow-600 mt-1">
-                      ⚠️ Dati salvati nel database. Potrebbero non essere aggiornati se i metafields Shopify sono cambiati.
+                    <p className="text-xs text-gray-600 mt-1">
+                      ℹ️ Dati dal database locale (apertura dialog aggiorna automaticamente dal Shopify)
                     </p>
                   )}
                 </CardHeader>
