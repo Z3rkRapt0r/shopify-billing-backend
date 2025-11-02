@@ -571,6 +571,13 @@ export default function AdminDashboard() {
               >
                 Note di Credito
               </Button>
+              <Button 
+                onClick={() => window.location.href = '/admin/corrispettivi'}
+                variant="outline"
+                className="bg-gray-100 hover:bg-gray-200"
+              >
+                📋 Corrispettivi
+              </Button>
             </div>
           </CardContent>
         </Card>
