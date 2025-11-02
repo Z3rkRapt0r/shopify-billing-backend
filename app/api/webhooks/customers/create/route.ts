@@ -24,16 +24,7 @@ export async function POST(request: NextRequest) {
     
     // Estrai dati di fatturazione dai metafields
     const billingData = extractBillingDataFromMetafields(metafields);
-    let isBusiness = isBusinessCustomer(metafields);
-    
-    // 🔍 FALLBACK: Se non ha metafields Business, controlla il campo "company" standard
-    const primaryAddress = webhookData.addresses?.[0] as any;
-    const hasCompany = primaryAddress?.company && primaryAddress.company.trim().length > 0;
-    
-    if (!isBusiness && hasCompany) {
-      console.log(`🏢 Webhook: Cliente con Company field: ${webhookData.email} → "${primaryAddress.company}"`);
-      isBusiness = true;
-    }
+    const isBusiness = isBusinessCustomer(metafields);
     
     // Upsert utente nel nostro database
     const user = await prisma.user.upsert({
@@ -55,9 +46,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Se il cliente è Business (ha metafields compilati o company field), crea/aggiorna billing profile
-    if (isBusiness) {
-      const companyName = billingData?.ragioneSociale || primaryAddress?.company || undefined;
+    // Se il cliente è Business (SOLO tramite metafields), crea/aggiorna billing profile
+    if (isBusiness && billingData) {
+      const primaryAddress = webhookData.addresses?.[0] as any;
+      const companyName = billingData.ragioneSociale || undefined;
       
       const billingProfileData = {
         companyName: companyName,

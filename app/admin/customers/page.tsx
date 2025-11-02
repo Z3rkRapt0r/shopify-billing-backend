@@ -142,11 +142,12 @@ export default function CustomersPage() {
       let hasMore = true;
       let pageInfo: string | undefined = undefined;
       let batchNumber = 0;
+      const MAX_BATCHES = 50; // Limite di sicurezza: ~2500 clienti max
 
       addSyncEvent('🔍 Avvio sincronizzazione con cursor pagination...', 'info');
       
-      // Continua finché ci sono altri clienti (NESSUN LIMITE!)
-      while (hasMore) {
+      // Continua finché ci sono altri clienti
+      while (hasMore && batchNumber < MAX_BATCHES) {
         batchNumber++;
         addSyncEvent(`📦 Elaborazione batch #${batchNumber}...`, 'info');
 
@@ -213,6 +214,12 @@ export default function CustomersPage() {
         // Se non ci sono più clienti, fermati
         if (!hasMore) {
           addSyncEvent(`🏁 Tutti i clienti sono stati analizzati!`, 'success');
+          break;
+        }
+        
+        // Verifica limite di sicurezza
+        if (batchNumber >= MAX_BATCHES) {
+          addSyncEvent(`⚠️  Raggiunto limite di sicurezza (${MAX_BATCHES} batch). Contatta supporto se hai più di 2500 clienti.`, 'error');
           break;
         }
 

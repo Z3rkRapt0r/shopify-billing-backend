@@ -45,6 +45,13 @@ export async function POST(request: NextRequest) {
       const firstId = customers[0].id;
       const lastId = customers[customers.length - 1].id;
       console.log(`   Range ID: ${firstId} → ${lastId}`);
+      
+      // 🔍 Verifica duplicati
+      const customerIds = customers.map((c: any) => c.id.toString());
+      const uniqueIds = new Set(customerIds);
+      if (customerIds.length !== uniqueIds.size) {
+        console.warn(`⚠️  ATTENZIONE: Clienti duplicati nel batch! ${customerIds.length} totali, ${uniqueIds.size} unici`);
+      }
     }
 
     // Processa TUTTI i clienti ricevuti da questo batch
@@ -59,30 +66,30 @@ export async function POST(request: NextRequest) {
       
       // Estrai dati di fatturazione dai metafields
       const billingData = extractBillingDataFromMetafields(metafields);
-      let isBusiness = isBusinessCustomer(metafields);
+      const isBusiness = isBusinessCustomer(metafields);
       
-      // 🔍 FALLBACK: Se non ha metafields Business, controlla il campo "company" standard
-      const primaryAddress = customer.addresses?.[0] as any;
-      const hasCompany = primaryAddress?.company && primaryAddress.company.trim().length > 0;
-      
-      if (!isBusiness && hasCompany) {
-        console.log(`🏢 Cliente con Company field: ${customer.email} → "${primaryAddress.company}"`);
-        isBusiness = true;
-      }
-      
-      // IMPORTANTE: Sincronizza SOLO i clienti Business
+      // ⚠️ IMPORTANTE: Sincronizza SOLO clienti con metafields Business
+      // NON usare il campo "company" standard come criterio
       if (!isBusiness) {
-        console.log(`⏭️  Skipping private customer: ${customer.email} (no business indicators)`);
+        console.log(`⏭️  Skipping customer: ${customer.email} (no business metafields)`);
         skippedCount++;
         processedCount++;
         lastCustomerId = customer.id.toString();
         continue;
       }
       
-      console.log(`✅ Identificato Business customer: ${customer.email} (${hasCompany ? 'company field' : 'metafields'})`);
+      if (!billingData) {
+        console.log(`⚠️  Business customer without billing data: ${customer.email}`);
+        skippedCount++;
+        processedCount++;
+        lastCustomerId = customer.id.toString();
+        continue;
+      }
       
-      // Se non ha billingData da metafields ma ha company, usa quello
-      const companyName = billingData?.ragioneSociale || primaryAddress?.company || undefined;
+      console.log(`✅ Business customer: ${customer.email} (${billingData.ragioneSociale || billingData.partitaIva})`);
+      
+      const primaryAddress = customer.addresses?.[0] as any;
+      const companyName = billingData.ragioneSociale || undefined;
 
         // Cliente Business - sincronizza
         const user = await prisma.user.upsert({
