@@ -33,6 +33,21 @@ interface CustomerDetail {
     postalCode: string | null;
     countryCode: string | null;
     isBusiness: boolean;
+    source?: string; // 'shopify_realtime' o undefined (DB)
+  } | null;
+  billingProfileFromDb?: {
+    companyName: string | null;
+    vatNumber: string | null;
+    taxCode: string | null;
+    pec: string | null;
+    sdiCode: string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    province: string | null;
+    postalCode: string | null;
+    countryCode: string | null;
+    isBusiness: boolean;
   } | null;
   shopifyMetafields: {
     id: string;
@@ -154,7 +169,26 @@ export function CustomerDetailDialog({
             {customer.billingProfile && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">🏢 Profilo Fatturazione</CardTitle>
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    <span>🏢 Profilo Fatturazione</span>
+                    {customer.billingProfile.source === 'shopify_realtime' ? (
+                      <Badge className="bg-green-600">🔄 Aggiornato in tempo reale</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-yellow-600 border-yellow-400">
+                        📦 Da Database
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  {customer.billingProfile.source === 'shopify_realtime' && (
+                    <p className="text-xs text-green-600 mt-1">
+                      ✓ Dati recuperati in tempo reale dai metafields Shopify
+                    </p>
+                  )}
+                  {!customer.billingProfile.source && (
+                    <p className="text-xs text-yellow-600 mt-1">
+                      ⚠️ Dati salvati nel database. Potrebbero non essere aggiornati se i metafields Shopify sono cambiati.
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4">
                   {customer.billingProfile.companyName && (
