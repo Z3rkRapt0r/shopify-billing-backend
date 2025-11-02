@@ -77,10 +77,10 @@ export async function POST(request: NextRequest) {
     let invoiceStatus: 'PENDING' | 'FOREIGN' | 'CORRISPETTIVO' = 'PENDING';
     
     // Verifica se l'utente ha un profilo fatturazione valido per l'Italia
-    const hasVatProfile = user.billingProfile && 
-                         user.billingProfile.isBusiness && 
-                         billingCountryCode === 'IT' &&
-                         (user.billingProfile.vatNumber || user.billingProfile.taxCode);
+    const hasVatProfile = !!(user.billingProfile && 
+                             user.billingProfile.isBusiness && 
+                             billingCountryCode === 'IT' &&
+                             (user.billingProfile.vatNumber || user.billingProfile.taxCode));
     
     // Determina stato ordine in base al tipo cliente
     if (billingCountryCode && billingCountryCode !== 'IT') {
