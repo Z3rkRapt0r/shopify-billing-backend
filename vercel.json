@@ -17,8 +17,6 @@
     }
   ],
   "env": {
-    "NEXTAUTH_URL": "@nextauth_url",
-    "NEXTAUTH_SECRET": "@nextauth_secret",
     "DATABASE_URL": "@database_url",
     "SHOPIFY_SHOP": "@shopify_shop",
     "SHOPIFY_API_KEY": "@shopify_api_key",
