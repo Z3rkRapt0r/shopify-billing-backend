@@ -32,6 +32,7 @@ interface Order {
 }
 
 export default function OrdersPage() {
+  const [adminPassword, setAdminPassword] = useState('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +45,22 @@ export default function OrdersPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
-  // Carica ordini
+  // Recupera password da sessionStorage
   useEffect(() => {
-    loadOrders();
-  }, [page, search, statusFilter, fromDate, toDate]);
+    const savedPassword = sessionStorage.getItem('adminPassword');
+    if (savedPassword) {
+      setAdminPassword(savedPassword);
+    } else {
+      window.location.href = '/admin';
+    }
+  }, []);
+
+  // Carica ordini solo se autenticato
+  useEffect(() => {
+    if (adminPassword) {
+      loadOrders();
+    }
+  }, [page, search, statusFilter, fromDate, toDate, adminPassword]);
 
   const loadOrders = async () => {
     try {
@@ -76,7 +89,7 @@ export default function OrdersPage() {
 
       const response = await fetch(`/api/admin/orders?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
         },
       });
 
@@ -101,7 +114,7 @@ export default function OrdersPage() {
       const response = await fetch('/api/invoices/issue', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ shopifyOrderId }),
@@ -130,7 +143,7 @@ export default function OrdersPage() {
       const response = await fetch('/api/admin/orders', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -160,7 +173,7 @@ export default function OrdersPage() {
       const response = await fetch('/api/admin/orders', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

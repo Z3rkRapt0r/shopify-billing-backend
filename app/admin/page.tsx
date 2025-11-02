@@ -65,6 +65,15 @@ export default function AdminDashboard() {
   const [syncing, setSyncing] = useState(false);
   const [issuingInvoice, setIssuingInvoice] = useState<string | null>(null);
 
+  // Recupera password da sessionStorage all'avvio
+  useEffect(() => {
+    const savedPassword = sessionStorage.getItem('adminPassword');
+    if (savedPassword) {
+      setAdminPassword(savedPassword);
+      setIsAuthenticated(true);
+    }
+  }, []);
+
   // Carica dati KPI solo dopo autenticazione
   useEffect(() => {
     if (isAuthenticated) {
@@ -189,6 +198,8 @@ export default function AdminDashboard() {
       });
 
       if (response.ok) {
+        // Salva la password in sessionStorage per condividerla tra le pagine
+        sessionStorage.setItem('adminPassword', passwordInput);
         setAdminPassword(passwordInput);
         setIsAuthenticated(true);
         setPasswordInput('');

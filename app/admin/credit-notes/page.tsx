@@ -33,6 +33,7 @@ interface CreditNote {
 }
 
 export default function CreditNotesPage() {
+  const [adminPassword, setAdminPassword] = useState('');
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,10 +44,22 @@ export default function CreditNotesPage() {
   const [issuingCreditNote, setIssuingCreditNote] = useState<string | null>(null);
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
 
-  // Carica note di credito
+  // Recupera password da sessionStorage
   useEffect(() => {
-    loadCreditNotes();
-  }, [page, search, statusFilter]);
+    const savedPassword = sessionStorage.getItem('adminPassword');
+    if (savedPassword) {
+      setAdminPassword(savedPassword);
+    } else {
+      window.location.href = '/admin';
+    }
+  }, []);
+
+  // Carica note di credito solo se autenticato
+  useEffect(() => {
+    if (adminPassword) {
+      loadCreditNotes();
+    }
+  }, [page, search, statusFilter, adminPassword]);
 
   const loadCreditNotes = async () => {
     try {
@@ -67,7 +80,7 @@ export default function CreditNotesPage() {
 
       const response = await fetch(`/api/credit-notes/issue?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
         },
       });
 
@@ -92,7 +105,7 @@ export default function CreditNotesPage() {
       const response = await fetch('/api/credit-notes/issue', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ orderId, reason }),

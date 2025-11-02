@@ -25,6 +25,7 @@ interface User {
 }
 
 export default function CustomersPage() {
+  const [adminPassword, setAdminPassword] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,10 +36,23 @@ export default function CustomersPage() {
   const [markingBusiness, setMarkingBusiness] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
-  // Carica clienti
+  // Recupera password da sessionStorage
   useEffect(() => {
-    loadCustomers();
-  }, [page, search, isBusinessFilter]);
+    const savedPassword = sessionStorage.getItem('adminPassword');
+    if (savedPassword) {
+      setAdminPassword(savedPassword);
+    } else {
+      // Redirect al login se non autenticato
+      window.location.href = '/admin';
+    }
+  }, []);
+
+  // Carica clienti solo se autenticato
+  useEffect(() => {
+    if (adminPassword) {
+      loadCustomers();
+    }
+  }, [page, search, isBusinessFilter, adminPassword]);
 
   const loadCustomers = async () => {
     try {
@@ -59,7 +73,7 @@ export default function CustomersPage() {
 
       const response = await fetch(`/api/admin/mark-business?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
         },
       });
 
@@ -84,7 +98,7 @@ export default function CustomersPage() {
       const response = await fetch('/api/admin/sync-customers', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ limit: 50 }),
@@ -113,7 +127,7 @@ export default function CustomersPage() {
       const response = await fetch('/api/admin/mark-business', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Authorization': `Bearer ${adminPassword}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
