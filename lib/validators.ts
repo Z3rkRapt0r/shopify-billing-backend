@@ -89,16 +89,16 @@ export const queueJobSchema = z.object({
 export const shopifyCustomerWebhookSchema = z.object({
   id: z.number().transform(String), // Convert to string for our DB
   email: z.string().email(),
-  first_name: z.string().optional(),
-  last_name: z.string().optional(),
+  first_name: z.string().nullable().optional(),
+  last_name: z.string().nullable().optional(),
   addresses: z.array(z.object({
-    country_code: z.string().optional(),
-    province: z.string().optional(),
-    city: z.string().optional(),
-    address1: z.string().optional(),
-    address2: z.string().optional(),
-    zip: z.string().optional(),
-  })).optional(),
+    country_code: z.string().nullable().optional(),
+    province: z.string().nullable().optional(),
+    city: z.string().nullable().optional(),
+    address1: z.string().nullable().optional(),
+    address2: z.string().nullable().optional(),
+    zip: z.string().nullable().optional(),
+  })).nullable().optional(),
 });
 
 export const shopifyOrderWebhookSchema = z.object({
@@ -107,20 +107,20 @@ export const shopifyOrderWebhookSchema = z.object({
   customer: z.object({
     id: z.number().transform(String),
     email: z.string().email(),
-    first_name: z.string().optional(),
-    last_name: z.string().optional(),
+    first_name: z.string().nullable().optional(),
+    last_name: z.string().nullable().optional(),
   }),
-  currency: z.string().optional(),
+  currency: z.string().nullable().optional(),
   total_price: z.string().transform(Number),
   created_at: z.string().transform(dateStr => new Date(dateStr)),
   billing_address: z.object({
-    country_code: z.string().optional(),
-    province: z.string().optional(),
-    city: z.string().optional(),
-    address1: z.string().optional(),
-    address2: z.string().optional(),
-    zip: z.string().optional(),
-  }).optional(),
+    country_code: z.string().nullable().optional(),
+    province: z.string().nullable().optional(),
+    city: z.string().nullable().optional(),
+    address1: z.string().nullable().optional(),
+    address2: z.string().nullable().optional(),
+    zip: z.string().nullable().optional(),
+  }).nullable().optional(),
 });
 
 // Validator per API requests
