@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createShopifyClient, extractBillingDataFromMetafields, isBusinessCustomer } from '@/lib/shopify';
-import { billingProfileSchema } from '@/lib/validators';
 
 export async function GET(
   request: NextRequest,
@@ -53,59 +52,25 @@ export async function GET(
         const customerResponse = await shopifyClient.getCustomer(shopifyCustomerId);
         const primaryAddress = customerResponse.customer?.addresses?.[0] as any;
         
-        const billingProfileData = {
-          companyName: billingData.ragioneSociale || undefined,
-          vatNumber: billingData.partitaIva || undefined,
-          taxCode: billingData.codiceFiscale || undefined,
-          pec: undefined, // Non nei metafields standard
-          sdiCode: billingData.codiceSdi || undefined,
-          addressLine1: primaryAddress?.address1 || undefined,
-          addressLine2: primaryAddress?.address2 || undefined,
-          city: primaryAddress?.city || undefined,
-          province: primaryAddress?.province || undefined,
-          postalCode: primaryAddress?.zip || undefined,
-          countryCode: primaryAddress?.country_code || user.countryCode || 'IT',
+        billingProfileFromShopify = {
+          companyName: billingData.ragioneSociale || null,
+          vatNumber: billingData.partitaIva || null,
+          taxCode: billingData.codiceFiscale || null,
+          pec: null,
+          sdiCode: billingData.codiceSdi || null,
+          addressLine1: primaryAddress?.address1 || null,
+          addressLine2: primaryAddress?.address2 || null,
+          city: primaryAddress?.city || null,
+          province: primaryAddress?.province || null,
+          postalCode: primaryAddress?.zip || null,
+          countryCode: primaryAddress?.country_code || user.countryCode || null,
           isBusiness: true,
+          source: 'shopify_realtime', // Flag per indicare che è aggiornato
         };
-
-        // Validazione con Zod
-        const validationResult = billingProfileSchema.safeParse(billingProfileData);
         
-        if (validationResult.success) {
-          // 🔄 AGGIORNA DATABASE con dati Shopify aggiornati
-          const updatedProfile = await prisma.billingProfile.upsert({
-            where: {
-              userId: user.id,
-            },
-            update: validationResult.data,
-            create: {
-              userId: user.id,
-              ...validationResult.data,
-            },
-          });
-          
-          billingProfileFromShopify = {
-            ...updatedProfile,
-            source: 'shopify_realtime', // Flag per indicare che è aggiornato
-          };
-          
-          console.log(`✅ Billing profile aggiornato in tempo reale e salvato in DB per ${user.email}`);
-        } else {
-          console.error(`❌ Validazione billing profile fallita per ${user.email}:`, validationResult.error.errors);
-          // Se validazione fallisce, usa quello del DB
-        }
+        console.log(`✅ Billing profile recuperato in tempo reale per ${user.email} (non salvato in DB - si aggiorna quando entri nella pagina clienti)`);
       } else {
         console.log(`ℹ️  Cliente ${user.email} non è Business (metafields mancanti o incompleti)`);
-        
-        // Se non è più Business ma ha un billing profile nel DB, rimuovilo
-        if (user.billingProfile?.isBusiness) {
-          await prisma.billingProfile.delete({
-            where: {
-              userId: user.id,
-            },
-          });
-          console.log(`🗑️  Billing profile rimosso dal DB per ${user.email} (non più Business)`);
-        }
       }
     } catch (error) {
       console.error('Error fetching Shopify metafields:', error);

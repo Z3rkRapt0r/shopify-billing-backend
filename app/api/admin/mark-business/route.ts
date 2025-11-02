@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { markBusinessSchema } from '@/lib/validators';
+import { markBusinessSchema, billingProfileSchema } from '@/lib/validators';
+import { createShopifyClient, extractBillingDataFromMetafields, isBusinessCustomer } from '@/lib/shopify';
 
 export async function POST(request: NextRequest) {
   try {
@@ -163,6 +164,98 @@ export async function GET(request: NextRequest) {
       prisma.user.count({ where }),
     ]);
 
+    // 🔄 AUTO-SYNC: Aggiorna billing profile da Shopify per i clienti visibili
+    const autoSync = searchParams.get('autoSync') !== 'false'; // Default: true
+    
+    if (autoSync && users.length > 0) {
+      console.log(`🔄 Auto-sync billing profiles per ${users.length} clienti...`);
+      const shopifyClient = createShopifyClient();
+      
+      // Aggiorna ogni cliente in parallelo (con rate limiting)
+      for (const user of users) {
+        try {
+          // Delay di 500ms tra chiamate per rispettare rate limit Shopify
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Recupera metafields da Shopify
+          const metafieldsResponse = await shopifyClient.getCustomerMetafields(user.shopifyCustomerId);
+          const metafields = metafieldsResponse.metafields || [];
+          
+          // Verifica se è Business
+          const billingData = extractBillingDataFromMetafields(metafields);
+          const isBusiness = isBusinessCustomer(metafields);
+          
+          if (isBusiness && billingData) {
+            // Recupera indirizzo del cliente
+            const customerResponse = await shopifyClient.getCustomer(user.shopifyCustomerId);
+            const primaryAddress = customerResponse.customer?.addresses?.[0] as any;
+            
+            const billingProfileData = {
+              companyName: billingData.ragioneSociale || undefined,
+              vatNumber: billingData.partitaIva || undefined,
+              taxCode: billingData.codiceFiscale || undefined,
+              pec: undefined,
+              sdiCode: billingData.codiceSdi || undefined,
+              addressLine1: primaryAddress?.address1 || undefined,
+              addressLine2: primaryAddress?.address2 || undefined,
+              city: primaryAddress?.city || undefined,
+              province: primaryAddress?.province || undefined,
+              postalCode: primaryAddress?.zip || undefined,
+              countryCode: primaryAddress?.country_code || user.countryCode || 'IT',
+              isBusiness: true,
+            };
+
+            const validationResult = billingProfileSchema.safeParse(billingProfileData);
+            
+            if (validationResult.success) {
+              // Aggiorna DB
+              await prisma.billingProfile.upsert({
+                where: { userId: user.id },
+                update: validationResult.data,
+                create: {
+                  userId: user.id,
+                  ...validationResult.data,
+                },
+              });
+              
+              // Aggiorna anche l'oggetto user in memoria per la risposta
+              const updatedData = validationResult.data;
+              user.billingProfile = {
+                id: user.billingProfile?.id || '',
+                userId: user.id,
+                companyName: updatedData.companyName ?? null,
+                vatNumber: updatedData.vatNumber ?? null,
+                taxCode: updatedData.taxCode ?? null,
+                pec: updatedData.pec ?? null,
+                sdiCode: updatedData.sdiCode ?? null,
+                addressLine1: updatedData.addressLine1 ?? null,
+                addressLine2: updatedData.addressLine2 ?? null,
+                city: updatedData.city ?? null,
+                province: updatedData.province ?? null,
+                postalCode: updatedData.postalCode ?? null,
+                countryCode: updatedData.countryCode ?? null,
+                isBusiness: updatedData.isBusiness,
+                createdAt: user.billingProfile?.createdAt || new Date(),
+                updatedAt: new Date(),
+              };
+              
+              console.log(`✅ Auto-sync: ${user.email} aggiornato`);
+            }
+          } else if (user.billingProfile?.isBusiness) {
+            // Non è più Business, rimuovi billing profile
+            await prisma.billingProfile.delete({ where: { userId: user.id } });
+            user.billingProfile = null;
+            console.log(`🗑️  Auto-sync: ${user.email} non più Business, profilo rimosso`);
+          }
+        } catch (error) {
+          console.error(`⚠️  Auto-sync fallito per ${user.email}:`, error instanceof Error ? error.message : 'Unknown error');
+          // Continua con gli altri clienti
+        }
+      }
+      
+      console.log(`✅ Auto-sync completato per ${users.length} clienti`);
+    }
+
     return NextResponse.json({
       users,
       pagination: {
@@ -171,6 +264,7 @@ export async function GET(request: NextRequest) {
         total,
         pages: Math.ceil(total / limit),
       },
+      autoSyncEnabled: autoSync,
     });
 
   } catch (error) {
