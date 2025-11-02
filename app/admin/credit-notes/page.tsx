@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 
@@ -121,7 +119,7 @@ export default function CreditNotesPage() {
     setPage(1); // Resetta alla prima pagina
   };
 
-  const handleFilter = (filter: string) => {
+  const handleFilter = (filter: string | null) => {
     setStatusFilter(filter === statusFilter ? null : filter);
     setPage(1); // Resetta alla prima pagina
   };
@@ -145,15 +143,15 @@ export default function CreditNotesPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'ISSUED':
-        return <Badge variant="success">Emessa</Badge>;
+        return <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">Emessa</span>;
       case 'PENDING':
-        return <Badge variant="warning">In Attesa</Badge>;
+        return <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">In Attesa</span>;
       case 'ERROR':
-        return <Badge variant="destructive">Errore</Badge>;
+        return <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800">Errore</span>;
       case 'FOREIGN':
-        return <Badge variant="info">Estero</Badge>;
+        return <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">Estero</span>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-800">{status}</span>;
     }
   };
 
@@ -187,24 +185,24 @@ export default function CreditNotesPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
-              <Button 
+              <button 
                 onClick={() => window.location.href = '/admin/customers'}
-                variant="outline"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
               >
                 Gestione Clienti
-              </Button>
-              <Button 
+              </button>
+              <button 
                 onClick={() => window.location.href = '/admin/orders'}
-                variant="outline"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
               >
                 Gestione Ordini
-              </Button>
-              <Button 
+              </button>
+              <button 
                 onClick={() => window.location.href = '/admin'}
-                variant="default"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
               >
                 Dashboard Admin
-              </Button>
+              </button>
             </div>
           </CardContent>
         </Card>
@@ -226,36 +224,36 @@ export default function CreditNotesPage() {
                 className="max-w-md"
               />
               <div className="flex gap-2">
-                <Button
-                  variant={statusFilter === 'PENDING' ? 'default' : 'outline'}
+                <button
+                  className={statusFilter === 'PENDING' ? 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2' : 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2'}
                   onClick={() => handleFilter('PENDING')}
                 >
                   In Attesa
-                </Button>
-                <Button
-                  variant={statusFilter === 'ISSUED' ? 'default' : 'outline'}
+                </button>
+                <button
+                  className={statusFilter === 'ISSUED' ? 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2' : 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2'}
                   onClick={() => handleFilter('ISSUED')}
                 >
                   Emesse
-                </Button>
-                <Button
-                  variant={statusFilter === 'ERROR' ? 'default' : 'outline'}
+                </button>
+                <button
+                  className={statusFilter === 'ERROR' ? 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2' : 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2'}
                   onClick={() => handleFilter('ERROR')}
                 >
                   Errori
-                </Button>
-                <Button
-                  variant={statusFilter === 'FOREIGN' ? 'default' : 'outline'}
+                </button>
+                <button
+                  className={statusFilter === 'FOREIGN' ? 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2' : 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2'}
                   onClick={() => handleFilter('FOREIGN')}
                 >
                   Esteri
-                </Button>
-                <Button
-                  variant={statusFilter === null ? 'default' : 'outline'}
+                </button>
+                <button
+                  className={statusFilter === null ? 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2' : 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2'}
                   onClick={() => handleFilter(null)}
                 >
                   Tutte
-                </Button>
+                </button>
               </div>
             </div>
           </CardContent>
@@ -348,22 +346,21 @@ export default function CreditNotesPage() {
                         <TableCell>
                           <div className="flex space-x-2">
                             {note.status === 'PENDING' && (
-                              <Button
-                                size="sm"
+                              <button
+                                className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-1"
                                 onClick={() => handleIssueCreditNote(note.orderId, 'Reso cliente')}
                                 disabled={issuingCreditNote === note.orderId}
                               >
                                 {issuingCreditNote === note.orderId ? 'Emissione...' : 'Emetti Nota'}
-                              </Button>
+                              </button>
                             )}
                             {note.status === 'ISSUED' && note.sdiCreditId && (
-                              <Button
-                                size="sm"
-                                variant="outline"
+                              <button
+                                className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-1"
                                 disabled
                               >
                                 SDI: {note.sdiCreditId}
-                              </Button>
+                              </button>
                             )}
                           </div>
                         </TableCell>
@@ -379,23 +376,23 @@ export default function CreditNotesPage() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex justify-center mt-8 space-x-2">
-            <Button
-              variant="outline"
+            <button
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
               onClick={() => handlePageChange(page - 1)}
               disabled={page === 1}
             >
               Precedente
-            </Button>
+            </button>
             <span className="px-4 py-2 text-sm text-gray-700">
               Pagina {page} di {totalPages}
             </span>
-            <Button
-              variant="outline"
+            <button
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
               onClick={() => handlePageChange(page + 1)}
               disabled={page === totalPages}
             >
               Successivo
-            </Button>
+            </button>
           </div>
         )}
       </div>
