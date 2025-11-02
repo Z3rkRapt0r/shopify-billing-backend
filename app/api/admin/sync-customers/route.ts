@@ -43,22 +43,36 @@ export async function POST(request: NextRequest) {
         // Delay di 300ms tra le chiamate per evitare 429 (max 3 richieste/secondo)
         await delay(300);
         
-        // Recupera metafields del cliente
-        const metafieldsResponse = await shopifyClient.getCustomerMetafields(customer.id.toString());
-        const metafields = metafieldsResponse.metafields || [];
-        
-        // Estrai dati di fatturazione dai metafields
-        const billingData = extractBillingDataFromMetafields(metafields);
-        const isBusiness = isBusinessCustomer(metafields);
-        
-        // IMPORTANTE: Sincronizza SOLO i clienti Business
-        if (!isBusiness) {
-          console.log(`⏭️  Skipping private customer: ${customer.email} (no business metafields)`);
-          skippedCount++;
-          processedCount++;
-          lastCustomerId = customer.id.toString();
-          continue;
-        }
+      // Recupera metafields del cliente
+      const metafieldsResponse = await shopifyClient.getCustomerMetafields(customer.id.toString());
+      const metafields = metafieldsResponse.metafields || [];
+      
+      // Estrai dati di fatturazione dai metafields
+      const billingData = extractBillingDataFromMetafields(metafields);
+      let isBusiness = isBusinessCustomer(metafields);
+      
+      // 🔍 FALLBACK: Se non ha metafields Business, controlla il campo "company" standard
+      const primaryAddress = customer.addresses?.[0] as any;
+      const hasCompany = primaryAddress?.company && primaryAddress.company.trim().length > 0;
+      
+      if (!isBusiness && hasCompany) {
+        console.log(`🏢 Cliente con Company field: ${customer.email} → "${primaryAddress.company}"`);
+        isBusiness = true;
+      }
+      
+      // IMPORTANTE: Sincronizza SOLO i clienti Business
+      if (!isBusiness) {
+        console.log(`⏭️  Skipping private customer: ${customer.email} (no business indicators)`);
+        skippedCount++;
+        processedCount++;
+        lastCustomerId = customer.id.toString();
+        continue;
+      }
+      
+      console.log(`✅ Identificato Business customer: ${customer.email} (${hasCompany ? 'company field' : 'metafields'})`);
+      
+      // Se non ha billingData da metafields ma ha company, usa quello
+      const companyName = billingData?.ragioneSociale || primaryAddress?.company || undefined;
 
         // Cliente Business - sincronizza
         const user = await prisma.user.upsert({
@@ -79,20 +93,13 @@ export async function POST(request: NextRequest) {
             countryCode: customer.addresses?.[0]?.country_code,
           },
         });
-
-        const primaryAddress = customer.addresses?.[0];
         
-        // TypeScript safety: billingData è garantito non-null qui
-        if (!billingData) {
-          console.error(`Unexpected: billingData is null for business customer ${customer.id}`);
-          continue;
-        }
-        
+        // Crea billingProfile con dati disponibili (metafields o company field)
         const billingProfileData = {
-          companyName: billingData.ragioneSociale || undefined,
-          vatNumber: billingData.partitaIva || undefined,
-          taxCode: billingData.codiceFiscale || undefined,
-          sdiCode: billingData.codiceSdi || undefined,
+          companyName: companyName,
+          vatNumber: billingData?.partitaIva || undefined,
+          taxCode: billingData?.codiceFiscale || undefined,
+          sdiCode: billingData?.codiceSdi || undefined,
           addressLine1: primaryAddress?.address1 || undefined,
           addressLine2: primaryAddress?.address2 || undefined,
           city: primaryAddress?.city || undefined,
@@ -115,7 +122,7 @@ export async function POST(request: NextRequest) {
           },
         });
         
-        console.log(`✅ Synced business customer: ${customer.email} (${billingData.ragioneSociale || billingData.partitaIva})`);
+        console.log(`✅ Synced business customer: ${customer.email} (${companyName || billingData?.partitaIva || 'company field'})`);
         syncedCount++;
         processedCount++;
         lastCustomerId = customer.id.toString();

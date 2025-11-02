@@ -24,7 +24,16 @@ export async function POST(request: NextRequest) {
     
     // Estrai dati di fatturazione dai metafields
     const billingData = extractBillingDataFromMetafields(metafields);
-    const isBusiness = isBusinessCustomer(metafields);
+    let isBusiness = isBusinessCustomer(metafields);
+    
+    // 🔍 FALLBACK: Se non ha metafields Business, controlla il campo "company" standard
+    const primaryAddress = webhookData.addresses?.[0] as any;
+    const hasCompany = primaryAddress?.company && primaryAddress.company.trim().length > 0;
+    
+    if (!isBusiness && hasCompany) {
+      console.log(`🏢 Webhook: Cliente con Company field: ${webhookData.email} → "${primaryAddress.company}"`);
+      isBusiness = true;
+    }
     
     // Upsert utente nel nostro database
     const user = await prisma.user.upsert({
@@ -46,15 +55,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Se il cliente è Business (ha metafields compilati), crea/aggiorna billing profile
-    if (isBusiness && billingData) {
-      const primaryAddress = webhookData.addresses?.[0] as any;
+    // Se il cliente è Business (ha metafields compilati o company field), crea/aggiorna billing profile
+    if (isBusiness) {
+      const companyName = billingData?.ragioneSociale || primaryAddress?.company || undefined;
       
       const billingProfileData = {
-        companyName: billingData.ragioneSociale || undefined,
-        vatNumber: billingData.partitaIva || undefined,
-        taxCode: billingData.codiceFiscale || undefined,
-        sdiCode: billingData.codiceSdi || undefined,
+        companyName: companyName,
+        vatNumber: billingData?.partitaIva || undefined,
+        taxCode: billingData?.codiceFiscale || undefined,
+        sdiCode: billingData?.codiceSdi || undefined,
         addressLine1: primaryAddress?.address1 || undefined,
         addressLine2: primaryAddress?.address2 || undefined,
         city: primaryAddress?.city || undefined,
@@ -78,7 +87,7 @@ export async function POST(request: NextRequest) {
         },
       });
       
-      console.log(`✅ Business customer ${webhookData.id} (${billingData.ragioneSociale}) created`);
+      console.log(`✅ Business customer ${webhookData.id} (${companyName || 'no company name'}) created`);
     } else {
       console.log(`ℹ️  Regular customer ${webhookData.id} created`);
     }
