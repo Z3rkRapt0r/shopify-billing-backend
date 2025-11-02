@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { limit = 50, page_info } = body;
+    const { limit = 25, page_info } = body; // Ridotto a 25 per evitare timeout 30s
 
     const shopifyClient = createShopifyClient();
     let syncedCount = 0; // Clienti Business sincronizzati
@@ -128,8 +128,8 @@ export async function POST(request: NextRequest) {
         }
         processedIds.add(customerId);
         
-        // ⏱️  Delay di 600ms tra le chiamate (rispetta 2 req/sec di Shopify)
-        await delay(600);
+        // ⏱️  Delay di 400ms tra le chiamate (rispetta 2 req/sec = 500ms min, 400ms sicuro)
+        await delay(400);
         
       // Recupera metafields del cliente con retry automatico per 429
       const metafieldsResponse = await retryWithBackoff(() => 

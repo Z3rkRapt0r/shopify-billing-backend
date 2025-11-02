@@ -142,7 +142,7 @@ export default function CustomersPage() {
       let hasMore = true;
       let pageInfo: string | undefined = undefined;
       let batchNumber = 0;
-      const MAX_BATCHES = 50; // Limite di sicurezza: ~2500 clienti max
+      const MAX_BATCHES = 60; // Limite di sicurezza: 60 batch × 25 clienti = 1500 clienti max
 
       addSyncEvent('🔍 Avvio sincronizzazione con cursor pagination...', 'info');
       
@@ -158,7 +158,7 @@ export default function CustomersPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ 
-            limit: 50,
+            limit: 25, // Ridotto per evitare timeout 30s
             page_info: pageInfo,
           }),
         });
