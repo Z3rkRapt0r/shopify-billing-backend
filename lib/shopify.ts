@@ -64,6 +64,11 @@ export class ShopifyAdminClient {
     return this.makeRequest(`/customers/${customerId}.json`);
   }
 
+  // Ottenere metafields di un cliente
+  async getCustomerMetafields(customerId: string) {
+    return this.makeRequest(`/customers/${customerId}/metafields.json`);
+  }
+
   // Ottenere ordini (paginato)
   async getOrders(params: { limit?: number; since_id?: string; status?: string } = {}) {
     const searchParams = new URLSearchParams();
@@ -184,4 +189,88 @@ export function generateCustomerAuthUrl(redirectUri: string): string {
   });
 
   return `https://${shopDomain}/identity/oauth/authorize?${params.toString()}`;
+}
+
+// Interfaccia per i metafields di fatturazione
+export interface BillingMetafields {
+  fatturaAutomaticamente?: boolean;
+  clienteUE?: boolean;
+  codiceSdi?: string;
+  codiceFiscale?: string;
+  partitaIva?: string;
+  ragioneSociale?: string;
+}
+
+// Funzione per estrarre dati di fatturazione dai metafields di Shopify
+export function extractBillingDataFromMetafields(metafields: any[]): BillingMetafields | null {
+  if (!metafields || metafields.length === 0) {
+    return null;
+  }
+
+  const billingData: BillingMetafields = {};
+  let hasAnyField = false;
+
+  for (const metafield of metafields) {
+    // Supporta sia "custom" che altri namespace
+    const key = metafield.key.toLowerCase().replace(/_/g, '');
+    
+    switch (key) {
+      case 'fatturaautomaticamente':
+      case 'fatturaautomatica':
+      case 'autofattura':
+        billingData.fatturaAutomaticamente = metafield.value === 'true' || metafield.value === true;
+        hasAnyField = true;
+        break;
+      
+      case 'clienteue':
+      case 'clienteunione':
+      case 'clienteeuropa':
+        billingData.clienteUE = metafield.value === 'true' || metafield.value === true;
+        hasAnyField = true;
+        break;
+      
+      case 'codicesdi':
+      case 'sdi':
+      case 'codicedestinario':
+        billingData.codiceSdi = metafield.value?.toString() || undefined;
+        hasAnyField = true;
+        break;
+      
+      case 'codicefiscale':
+      case 'cf':
+      case 'taxcode':
+        billingData.codiceFiscale = metafield.value?.toString() || undefined;
+        hasAnyField = true;
+        break;
+      
+      case 'partitaiva':
+      case 'piva':
+      case 'vatnumber':
+        billingData.partitaIva = metafield.value?.toString() || undefined;
+        hasAnyField = true;
+        break;
+      
+      case 'ragionesociale':
+      case 'companyname':
+      case 'azienda':
+        billingData.ragioneSociale = metafield.value?.toString() || undefined;
+        hasAnyField = true;
+        break;
+    }
+  }
+
+  // Se almeno un campo è presente, il cliente è Business
+  return hasAnyField ? billingData : null;
+}
+
+// Funzione per verificare se un cliente è Business basandosi sui metafields
+export function isBusinessCustomer(metafields: any[]): boolean {
+  const billingData = extractBillingDataFromMetafields(metafields);
+  
+  if (!billingData) {
+    return false;
+  }
+
+  // Un cliente è Business se ha almeno Partita IVA o Ragione Sociale
+  return !!(billingData.partitaIva || billingData.ragioneSociale);
 }

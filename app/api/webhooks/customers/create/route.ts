@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyShopifyWebhook, parseCustomerWebhook } from '@/lib/shopify';
+import { verifyShopifyWebhook, parseCustomerWebhook, createShopifyClient, extractBillingDataFromMetafields, isBusinessCustomer } from '@/lib/shopify';
 import { billingProfileSchema } from '@/lib/validators';
 
 export async function POST(request: NextRequest) {
@@ -16,6 +16,15 @@ export async function POST(request: NextRequest) {
 
     // Parse webhook data
     const webhookData = parseCustomerWebhook(JSON.parse(body));
+    
+    // Recupera metafields del cliente da Shopify
+    const shopifyClient = createShopifyClient();
+    const metafieldsResponse = await shopifyClient.getCustomerMetafields(webhookData.id);
+    const metafields = metafieldsResponse.metafields || [];
+    
+    // Estrai dati di fatturazione dai metafields
+    const billingData = extractBillingDataFromMetafields(metafields);
+    const isBusiness = isBusinessCustomer(metafields);
     
     // Upsert utente nel nostro database
     const user = await prisma.user.upsert({
@@ -37,18 +46,22 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Se l'utente ha un indirizzo italiano, crea/aggiorna il billing profile
-    const primaryAddress = webhookData.addresses?.[0] as any;
-    if (primaryAddress && primaryAddress.country_code === 'IT') {
+    // Se il cliente è Business (ha metafields compilati), crea/aggiorna billing profile
+    if (isBusiness && billingData) {
+      const primaryAddress = webhookData.addresses?.[0] as any;
+      
       const billingProfileData = {
-        companyName: primaryAddress.company || undefined,
-        addressLine1: primaryAddress.address1,
-        addressLine2: primaryAddress.address2,
-        city: primaryAddress.city,
-        province: primaryAddress.province,
-        postalCode: primaryAddress.zip,
-        countryCode: primaryAddress.country_code,
-        isBusiness: !!primaryAddress.company,
+        companyName: billingData.ragioneSociale || undefined,
+        vatNumber: billingData.partitaIva || undefined,
+        taxCode: billingData.codiceFiscale || undefined,
+        sdiCode: billingData.codiceSdi || undefined,
+        addressLine1: primaryAddress?.address1 || undefined,
+        addressLine2: primaryAddress?.address2 || undefined,
+        city: primaryAddress?.city || undefined,
+        province: primaryAddress?.province || undefined,
+        postalCode: primaryAddress?.zip || undefined,
+        countryCode: primaryAddress?.country_code || 'IT',
+        isBusiness: true,
       };
 
       // Validazione con Zod
@@ -64,9 +77,12 @@ export async function POST(request: NextRequest) {
           ...validatedData,
         },
       });
+      
+      console.log(`✅ Business customer ${webhookData.id} (${billingData.ragioneSociale}) created`);
+    } else {
+      console.log(`ℹ️  Regular customer ${webhookData.id} created`);
     }
 
-    console.log(`Customer ${webhookData.id} processed successfully`);
     return NextResponse.json({ success: true });
 
   } catch (error) {

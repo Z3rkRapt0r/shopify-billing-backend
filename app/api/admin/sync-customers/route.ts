@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createShopifyClient } from '@/lib/shopify';
+import { createShopifyClient, extractBillingDataFromMetafields, isBusinessCustomer } from '@/lib/shopify';
 import { billingProfileSchema } from '@/lib/validators';
 
 // POST - Sincronizza clienti da Shopify
@@ -37,6 +37,14 @@ export async function POST(request: NextRequest) {
 
       for (const customer of customers) {
         try {
+          // Recupera metafields del cliente
+          const metafieldsResponse = await shopifyClient.getCustomerMetafields(customer.id.toString());
+          const metafields = metafieldsResponse.metafields || [];
+          
+          // Estrai dati di fatturazione dai metafields
+          const billingData = extractBillingDataFromMetafields(metafields);
+          const isBusiness = isBusinessCustomer(metafields);
+          
           // Upsert utente
           const user = await prisma.user.upsert({
             where: {
@@ -57,18 +65,22 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          // Se ha indirizzo italiano, crea/aggiorna billing profile
-          const primaryAddress = customer.addresses?.[0];
-          if (primaryAddress && primaryAddress.country_code === 'IT') {
+          // Se il cliente è Business (ha metafields compilati), crea/aggiorna billing profile
+          if (isBusiness && billingData) {
+            const primaryAddress = customer.addresses?.[0];
+            
             const billingProfileData = {
-              companyName: primaryAddress.company || undefined,
-              addressLine1: primaryAddress.address1,
-              addressLine2: primaryAddress.address2,
-              city: primaryAddress.city,
-              province: primaryAddress.province,
-              postalCode: primaryAddress.zip,
-              countryCode: primaryAddress.country_code,
-              isBusiness: !!primaryAddress.company,
+              companyName: billingData.ragioneSociale || undefined,
+              vatNumber: billingData.partitaIva || undefined,
+              taxCode: billingData.codiceFiscale || undefined,
+              sdiCode: billingData.codiceSdi || undefined,
+              addressLine1: primaryAddress?.address1 || undefined,
+              addressLine2: primaryAddress?.address2 || undefined,
+              city: primaryAddress?.city || undefined,
+              province: primaryAddress?.province || undefined,
+              postalCode: primaryAddress?.zip || undefined,
+              countryCode: primaryAddress?.country_code || 'IT',
+              isBusiness: true,
             };
 
             const validatedData = billingProfileSchema.parse(billingProfileData);
@@ -83,6 +95,10 @@ export async function POST(request: NextRequest) {
                 ...validatedData,
               },
             });
+            
+            console.log(`✅ Synced business customer: ${customer.email} (${billingData.ragioneSociale || billingData.partitaIva})`);
+          } else {
+            console.log(`ℹ️  Synced regular customer: ${customer.email}`);
           }
 
           syncedCount++;
