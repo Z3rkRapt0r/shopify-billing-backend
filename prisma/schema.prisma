@@ -80,6 +80,7 @@ enum InvoiceStatus {
   ISSUED
   ERROR
   FOREIGN
+  CORRISPETTIVO
 }
 
 model CreditNote {

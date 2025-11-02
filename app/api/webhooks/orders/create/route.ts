@@ -36,8 +36,20 @@ export async function POST(request: NextRequest) {
           email: webhookData.customer.email,
           firstName: webhookData.customer.first_name,
           lastName: webhookData.customer.last_name,
+          countryCode: webhookData.billing_address?.country_code,
         },
       });
+
+      // Determina stato per nuovo utente senza profilo
+      const billingCountryCode = webhookData.billing_address?.country_code;
+      let invoiceStatus: 'PENDING' | 'FOREIGN' | 'CORRISPETTIVO' = 'PENDING';
+      
+      if (billingCountryCode && billingCountryCode !== 'IT') {
+        invoiceStatus = 'FOREIGN';
+      } else if (billingCountryCode === 'IT') {
+        // Nuovo utente italiano senza profilo → CORRISPETTIVO
+        invoiceStatus = 'CORRISPETTIVO';
+      }
 
       // Crea l'ordine senza profilo fatturazione
       const orderData = {
@@ -48,7 +60,7 @@ export async function POST(request: NextRequest) {
         totalPrice: webhookData.total_price,
         shopifyCreatedAt: webhookData.created_at,
         hasVatProfile: false,
-        invoiceStatus: 'PENDING' as const,
+        invoiceStatus,
       };
 
       const validatedOrderData = orderSnapshotSchema.parse(orderData);
@@ -62,17 +74,28 @@ export async function POST(request: NextRequest) {
 
     // Determina lo stato della fattura in base al paese del cliente
     const billingCountryCode = webhookData.billing_address?.country_code || user.countryCode;
-    let invoiceStatus: 'PENDING' | 'FOREIGN' = 'PENDING';
+    let invoiceStatus: 'PENDING' | 'FOREIGN' | 'CORRISPETTIVO' = 'PENDING';
     
-    if (billingCountryCode && billingCountryCode !== 'IT') {
-      invoiceStatus = 'FOREIGN';
-    }
-
     // Verifica se l'utente ha un profilo fatturazione valido per l'Italia
     const hasVatProfile = user.billingProfile && 
                          user.billingProfile.isBusiness && 
                          billingCountryCode === 'IT' &&
                          (user.billingProfile.vatNumber || user.billingProfile.taxCode);
+    
+    // Determina stato ordine in base al tipo cliente
+    if (billingCountryCode && billingCountryCode !== 'IT') {
+      // Cliente estero → FOREIGN
+      invoiceStatus = 'FOREIGN';
+    } else if (!hasVatProfile && billingCountryCode === 'IT') {
+      // Cliente privato italiano (NO Business) → CORRISPETTIVO
+      invoiceStatus = 'CORRISPETTIVO';
+    } else if (hasVatProfile && billingCountryCode === 'IT') {
+      // Cliente Business italiano → PENDING (emissione fattura)
+      invoiceStatus = 'PENDING';
+    } else {
+      // Default: PENDING
+      invoiceStatus = 'PENDING';
+    }
 
     // Crea l'ordine
     const orderData = {

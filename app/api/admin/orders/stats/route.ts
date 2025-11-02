@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
       issuedInvoices,
       errorInvoices,
       foreignOrders,
+      corrispettiviOrders,
     ] = await Promise.all([
       // Clienti totali
       prisma.user.count(),
@@ -84,6 +85,14 @@ export async function GET(request: NextRequest) {
           invoiceStatus: 'FOREIGN',
         },
       }),
+      
+      // Corrispettivi
+      prisma.orderSnapshot.count({
+        where: {
+          ...dateFilter,
+          invoiceStatus: 'CORRISPETTIVO',
+        },
+      }),
     ]);
 
     // Calcola totali monetari
@@ -93,6 +102,7 @@ export async function GET(request: NextRequest) {
       issuedRevenue,
       errorRevenue,
       foreignRevenue,
+      corrispettiviRevenue,
     ] = await Promise.all([
       // Revenue totale
       prisma.orderSnapshot.aggregate({
@@ -132,6 +142,15 @@ export async function GET(request: NextRequest) {
         where: {
           ...dateFilter,
           invoiceStatus: 'FOREIGN',
+        },
+        _sum: { totalPrice: true },
+      }),
+      
+      // Revenue corrispettivi
+      prisma.orderSnapshot.aggregate({
+        where: {
+          ...dateFilter,
+          invoiceStatus: 'CORRISPETTIVO',
         },
         _sum: { totalPrice: true },
       }),
@@ -176,6 +195,7 @@ export async function GET(request: NextRequest) {
       issuedInvoices,
       errorInvoices,
       foreignOrders,
+      corrispettiviOrders,
       
       // Revenue
       totalRevenue: totalRevenue._sum.totalPrice ? Number(totalRevenue._sum.totalPrice) : 0,
@@ -183,6 +203,7 @@ export async function GET(request: NextRequest) {
       issuedRevenue: issuedRevenue._sum.totalPrice ? Number(issuedRevenue._sum.totalPrice) : 0,
       errorRevenue: errorRevenue._sum.totalPrice ? Number(errorRevenue._sum.totalPrice) : 0,
       foreignRevenue: foreignRevenue._sum.totalPrice ? Number(foreignRevenue._sum.totalPrice) : 0,
+      corrispettiviRevenue: corrispettiviRevenue._sum.totalPrice ? Number(corrispettiviRevenue._sum.totalPrice) : 0,
       
       // Statistiche dettagliate
       statusStats: statusStats.reduce((acc, stat) => {

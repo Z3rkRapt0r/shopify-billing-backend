@@ -59,7 +59,7 @@ export const orderSnapshotSchema = z.object({
   totalPrice: z.number().nullable().optional(),
   shopifyCreatedAt: z.date().nullable().optional(),
   hasVatProfile: z.boolean().default(false),
-  invoiceStatus: z.enum(['PENDING', 'ISSUED', 'ERROR', 'FOREIGN']).default('PENDING'),
+  invoiceStatus: z.enum(['PENDING', 'ISSUED', 'ERROR', 'FOREIGN', 'CORRISPETTIVO']).default('PENDING'),
   invoiceId: z.string().nullable().optional(),
   invoiceDate: z.date().nullable().optional(),
   lastError: z.string().nullable().optional(),
