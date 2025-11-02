@@ -72,7 +72,6 @@ model OrderSnapshot {
   @@index([userId])
   @@index([shopifyOrderId])
   @@index([invoiceStatus])
-  @@index([countryCode])
 }
 
 enum InvoiceStatus {
@@ -98,7 +97,7 @@ model QueueJob {
   id          String   @id @default(cuid())
   type        String   // 'invoice', 'credit_note', 'sync_customers'
   payload     Json     // payload JSON per il job
-  status      String   @default(PENDING) // PENDING, PROCESSING, COMPLETED, FAILED
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
   attempts    Int      @default(0)
   maxAttempts Int      @default(3)
   lastError   String?
