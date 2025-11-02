@@ -15,18 +15,5 @@
       "path": "/api/cron/retry-pending",
       "schedule": "0 2 * * *"
     }
-  ],
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "SHOPIFY_SHOP": "@shopify_shop",
-    "SHOPIFY_API_KEY": "@shopify_api_key",
-    "SHOPIFY_API_SECRET": "@shopify_api_secret",
-    "SHOPIFY_ACCESS_TOKEN": "@shopify_access_token",
-    "OPENAPI_SDI_BASE_URL": "@openapi_sdi_base_url",
-    "OPENAPI_SDI_TOKEN": "@openapi_sdi_token",
-    "SUPPLIER_VAT_NUMBER": "@supplier_vat_number",
-    "SUPPLIER_TAX_CODE": "@supplier_tax_code",
-    "ADMIN_PASSWORD": "@admin_password",
-    "CRON_SECRET": "@cron_secret"
-  }
+  ]
 }
