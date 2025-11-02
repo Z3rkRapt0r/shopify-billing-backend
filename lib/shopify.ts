@@ -74,16 +74,19 @@ export class ShopifyAdminClient {
 
   // Ottenere clienti (paginato con cursor)
   async getCustomers(params: { limit?: number; page_info?: string } = {}) {
-    const searchParams = new URLSearchParams();
-    if (params.limit) searchParams.append('limit', params.limit.toString());
+    let endpoint: string;
+    
     if (params.page_info) {
-      searchParams.append('page_info', params.page_info);
-      console.log(`🔄 Usando page_info per paginazione: ${params.page_info.substring(0, 30)}...`);
+      // ⚠️ IMPORTANTE: NON usare URLSearchParams per page_info!
+      // Shopify richiede che page_info NON sia URL-encoded
+      endpoint = `/customers.json?limit=${params.limit || 50}&page_info=${params.page_info}`;
+      console.log(`🔄 Usando page_info RAW (non encoded): ${params.page_info.substring(0, 30)}...`);
     } else {
+      endpoint = `/customers.json?limit=${params.limit || 50}`;
       console.log(`🔄 Prima pagina (no page_info)`);
     }
 
-    const endpoint = `/customers.json?${searchParams.toString()}`;
+    console.log(`📡 Endpoint completo: ${endpoint.substring(0, 100)}...`);
     return this.makeRequest(endpoint);
   }
 

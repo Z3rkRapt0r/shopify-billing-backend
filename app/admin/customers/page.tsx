@@ -176,7 +176,15 @@ export default function CustomersPage() {
           skippedCount: data.skippedCount,
           hasMore: data.hasMore,
           pageInfo: data.pageInfo ? 'presente' : 'assente',
+          loopDetected: data.loopDetected,
         });
+        
+        // 🚨 RILEVAMENTO LOOP dal backend
+        if (data.loopDetected) {
+          addSyncEvent(`🚨 LOOP RILEVATO! Stessi clienti processati più volte. Sincronizzazione fermata.`, 'error');
+          console.error(`🚨 Loop detection: backend ha fermato la sincronizzazione`);
+          break;
+        }
         
         // Accumula statistiche
         totalSynced += data.syncedCount || 0;

@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     let skippedCount = 0; // Clienti privati saltati
     let lastCustomerId: string | undefined = undefined;
     const processedIds = new Set<string>(); // Track IDs già processati
+    const seenRanges = new Set<string>(); // Track range ID per rilevare loop
 
     // Funzione helper per delay (evita 429)
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -70,7 +71,30 @@ export async function POST(request: NextRequest) {
     if (customers.length > 0) {
       const firstId = customers[0].id;
       const lastId = customers[customers.length - 1].id;
+      const rangeKey = `${firstId}-${lastId}`;
+      
       console.log(`   Range ID: ${firstId} → ${lastId}`);
+      
+      // 🚨 RILEVAMENTO LOOP: Verifica se abbiamo già visto questo range
+      if (seenRanges.has(rangeKey)) {
+        console.error(`\n🚨🚨🚨 LOOP RILEVATO! 🚨🚨🚨`);
+        console.error(`   Questo range è già stato processato!`);
+        console.error(`   Range: ${rangeKey}`);
+        console.error(`   La paginazione NON sta funzionando!`);
+        console.error(`   FERMANDO per evitare loop infinito.\n`);
+        
+        return NextResponse.json({
+          success: false,
+          error: 'Loop detection: same customer range returned',
+          syncedCount,
+          processedCount,
+          skippedCount,
+          pageInfo: null,
+          hasMore: false,
+          loopDetected: true,
+        }, { status: 200 });
+      }
+      seenRanges.add(rangeKey);
       
       // 🔍 IMPORTANTE: Confronta page_info per vedere se è cambiato
       if (page_info && nextPageInfo) {
