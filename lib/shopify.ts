@@ -53,12 +53,20 @@ export class ShopifyAdminClient {
     let pageInfo = null;
     
     if (linkHeader) {
+      console.log(`🔗 Link header completo: ${linkHeader}`);
+      
       // Parse: <https://.../customers.json?page_info=xyz>; rel="next"
-      const nextMatch = linkHeader.match(/page_info=([^>&\s]+)/);
+      // Il page_info è tra page_info= e il prossimo & o >
+      const nextMatch = linkHeader.match(/<[^>]*page_info=([^>&]+)[^>]*>;\s*rel="next"/);
       if (nextMatch) {
         pageInfo = nextMatch[1];
-        console.log(`📄 page_info trovato: ${pageInfo.substring(0, 20)}...`);
+        console.log(`📄 page_info estratto: ${pageInfo}`);
+        console.log(`   Lunghezza: ${pageInfo.length} caratteri`);
+      } else {
+        console.log(`⚠️  ATTENZIONE: Link header presente ma page_info NON trovato!`);
       }
+    } else {
+      console.log(`ℹ️  Nessun Link header (ultima pagina)`);
     }
     
     return { ...data, _pageInfo: pageInfo };
@@ -68,7 +76,12 @@ export class ShopifyAdminClient {
   async getCustomers(params: { limit?: number; page_info?: string } = {}) {
     const searchParams = new URLSearchParams();
     if (params.limit) searchParams.append('limit', params.limit.toString());
-    if (params.page_info) searchParams.append('page_info', params.page_info);
+    if (params.page_info) {
+      searchParams.append('page_info', params.page_info);
+      console.log(`🔄 Usando page_info per paginazione: ${params.page_info.substring(0, 30)}...`);
+    } else {
+      console.log(`🔄 Prima pagina (no page_info)`);
+    }
 
     const endpoint = `/customers.json?${searchParams.toString()}`;
     return this.makeRequest(endpoint);

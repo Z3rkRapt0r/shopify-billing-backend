@@ -47,31 +47,49 @@ export async function POST(request: NextRequest) {
 
     // ⚠️ IMPORTANTE: Fare UNA SOLA chiamata a Shopify per batch
     // Il frontend gestisce il loop per tutti i clienti
-    console.log(`🔍 Richiesta Shopify: limit=${limit}, page_info=${page_info ? page_info.substring(0, 20) + '...' : 'none'}`);
+    console.log(`\n========== NUOVO BATCH ==========`);
+    console.log(`🔍 Richiesta Shopify:`);
+    console.log(`   limit: ${limit}`);
+    console.log(`   page_info ricevuto: ${page_info ? page_info : 'NONE (prima pagina)'}`);
     
     const response = await shopifyClient.getCustomers({
-      limit: limit, // Richiedi il numero esatto di clienti
+      limit: limit,
       page_info: page_info,
     });
 
     const customers = response.customers || [];
     const nextPageInfo = response._pageInfo;
     
-    console.log(`📦 Ricevuti ${customers.length} clienti da Shopify (limit: ${limit})`);
-    console.log(`   nextPageInfo: ${nextPageInfo ? 'presente' : 'assente'}`);
+    console.log(`\n📦 RISPOSTA Shopify:`);
+    console.log(`   Clienti ricevuti: ${customers.length}`);
+    console.log(`   nextPageInfo presente: ${nextPageInfo ? 'SÌ' : 'NO'}`);
+    if (nextPageInfo) {
+      console.log(`   nextPageInfo value: ${nextPageInfo}`);
+    }
     
     if (customers.length > 0) {
       const firstId = customers[0].id;
       const lastId = customers[customers.length - 1].id;
       console.log(`   Range ID: ${firstId} → ${lastId}`);
       
-      // 🔍 Verifica duplicati
+      // 🔍 IMPORTANTE: Confronta page_info per vedere se è cambiato
+      if (page_info && nextPageInfo) {
+        const isSame = page_info === nextPageInfo;
+        console.log(`   page_info è cambiato: ${isSame ? '❌ NO (LOOP!)' : '✅ SÌ'}`);
+        if (isSame) {
+          console.error(`🚨 PROBLEMA CRITICO: Shopify restituisce lo STESSO page_info!`);
+          console.error(`   Questo causerà un loop infinito!`);
+        }
+      }
+      
+      // 🔍 Verifica duplicati nel batch
       const customerIds = customers.map((c: any) => c.id.toString());
       const uniqueIds = new Set(customerIds);
       if (customerIds.length !== uniqueIds.size) {
         console.warn(`⚠️  ATTENZIONE: Clienti duplicati nel batch! ${customerIds.length} totali, ${uniqueIds.size} unici`);
       }
     }
+    console.log(`=================================\n`);
 
     // Processa TUTTI i clienti ricevuti da questo batch
     for (const customer of customers) {
