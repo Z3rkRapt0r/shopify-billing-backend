@@ -54,6 +54,10 @@ export class ShopifyAdminClient {
     });
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => 'No error details');
+      console.error(`❌ Shopify API Error: ${response.status} ${response.statusText}`);
+      console.error(`   URL: ${url}`);
+      console.error(`   Response: ${errorText.substring(0, 500)}`);
       throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
     }
 

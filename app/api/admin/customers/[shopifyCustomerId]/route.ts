@@ -43,8 +43,10 @@ export async function GET(
     let billingProfileFromShopify = null;
     
     try {
+      console.log(`🔍 Recupero metafields Shopify per customer ID: ${shopifyCustomerId}`);
       const metafieldsResponse = await shopifyClient.getCustomerMetafields(shopifyCustomerId);
       shopifyMetafields = metafieldsResponse.metafields || [];
+      console.log(`✅ Recuperati ${shopifyMetafields.length} metafields per ${user.email}`);
       
       // Ricostruisci billing profile DAI METAFIELDS in tempo reale
       const billingData = extractBillingDataFromMetafields(shopifyMetafields);
@@ -76,7 +78,10 @@ export async function GET(
         console.log(`ℹ️  Cliente ${user.email} non è Business (metafields mancanti o incompleti)`);
       }
     } catch (error) {
-      console.error('Error fetching Shopify metafields:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`⚠️  Errore recupero metafields Shopify per ${user.email}:`, errorMessage);
+      console.error(`   Customer ID: ${shopifyCustomerId}`);
+      console.error(`   User email: ${user.email}`);
       // Se fallisce, usiamo il billing profile dal DB
     }
 
