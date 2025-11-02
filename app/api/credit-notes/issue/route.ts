@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { createOpenAPIClient, buildCreditNoteData } from '@/lib/openapiSdi';
 import { issueCreditNoteSchema } from '@/lib/validators';
 
+// Force dynamic rendering (usa headers per auth)
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     // Verifica autenticazione admin

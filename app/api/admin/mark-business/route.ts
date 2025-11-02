@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { markBusinessSchema, billingProfileSchema } from '@/lib/validators';
 import { createShopifyClient, extractBillingDataFromMetafields, isBusinessCustomer } from '@/lib/shopify';
 
+// Force dynamic rendering (usa headers per auth)
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     // Verifica autenticazione admin

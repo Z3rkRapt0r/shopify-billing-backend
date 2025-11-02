@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { createShopifyClient, extractBillingDataFromMetafields, isBusinessCustomer } from '@/lib/shopify';
 import { billingProfileSchema } from '@/lib/validators';
 
+// Force dynamic rendering (usa headers per auth)
+export const dynamic = 'force-dynamic';
+
 // POST - Sincronizza clienti da Shopify
 export async function POST(request: NextRequest) {
   try {
