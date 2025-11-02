@@ -126,27 +126,67 @@ export default function AdminDashboard() {
   };
 
   const handleSyncCustomers = async () => {
+    if (!confirm('Vuoi sincronizzare TUTTI i clienti Business da Shopify?\n\nQuesta operazione può richiedere diversi minuti.')) {
+      return;
+    }
+
     setSyncing(true);
     try {
-      const response = await fetch('/api/admin/sync-customers', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${adminPassword}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ limit: 50 }),
-      });
+      let totalSynced = 0;
+      let totalProcessed = 0;
+      let totalSkipped = 0;
+      let hasMore = true;
+      let lastCustomerId: string | undefined = undefined;
+      let batchNumber = 0;
 
-      if (!response.ok) {
-        throw new Error('Errore durante la sincronizzazione');
+      // Continua finché ci sono altri clienti
+      while (hasMore) {
+        batchNumber++;
+        console.log(`Sincronizzazione batch ${batchNumber}...`);
+
+        const response: Response = await fetch('/api/admin/sync-customers', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${adminPassword}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            limit: 50,
+            since_id: lastCustomerId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Errore durante la sincronizzazione');
+        }
+
+        const data = await response.json();
+        
+        // Accumula statistiche
+        totalSynced += data.syncedCount || 0;
+        totalProcessed += data.processedCount || 0;
+        totalSkipped += data.skippedCount || 0;
+        
+        hasMore = data.hasMore;
+        lastCustomerId = data.lastCustomerId;
+
+        console.log(`Batch ${batchNumber}: ${data.syncedCount} Business, ${data.skippedCount} privati`);
+
+        // Se non ci sono più clienti, fermati
+        if (!hasMore) {
+          break;
+        }
+
+        // Pausa tra i batch per non sovraccaricare
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      const data = await response.json();
       alert(
-        `✅ Sincronizzazione completata!\n\n` +
-        `📊 Clienti processati: ${data.processedCount}\n` +
-        `✅ Clienti Business sincronizzati: ${data.syncedCount}\n` +
-        `⏭️  Clienti privati saltati: ${data.skippedCount}`
+        `✅ Sincronizzazione COMPLETA!\n\n` +
+        `📊 Totale clienti processati: ${totalProcessed}\n` +
+        `✅ Clienti Business sincronizzati: ${totalSynced}\n` +
+        `⏭️  Clienti privati saltati: ${totalSkipped}\n\n` +
+        `🔄 Batch completati: ${batchNumber}`
       );
       
       // Ricarica i dati
