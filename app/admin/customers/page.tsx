@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { SyncProgressDialog } from '@/components/SyncProgressDialog';
+import { CustomerDetailDialog } from '@/components/CustomerDetailDialog';
 
 interface SyncEvent {
   timestamp: Date;
@@ -57,6 +58,10 @@ export default function CustomersPage() {
   
   // Ref per controllare lo stop della sincronizzazione
   const stopSyncRef = useRef(false);
+
+  // Stati per dialog dettaglio cliente
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
   // Recupera password da sessionStorage
   useEffect(() => {
@@ -301,6 +306,11 @@ export default function CustomersPage() {
     }
   };
 
+  const handleViewDetails = (shopifyCustomerId: string) => {
+    setSelectedCustomerId(shopifyCustomerId);
+    setShowDetailDialog(true);
+  };
+
   const handleMarkAsBusiness = async (shopifyCustomerId: string, isBusiness: boolean) => {
     setMarkingBusiness(shopifyCustomerId);
     try {
@@ -506,7 +516,15 @@ export default function CustomersPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewDetails(user.shopifyCustomerId)}
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                          >
+                            👁️ Dettagli
+                          </Button>
                           {!user.billingProfile?.isBusiness && (
                             <Button
                               size="sm"
@@ -587,6 +605,16 @@ export default function CustomersPage() {
         isSyncing={syncing}
         onStop={handleStopSync}
       />
+
+      {/* Dialog Dettaglio Cliente */}
+      {selectedCustomerId && (
+        <CustomerDetailDialog
+          isOpen={showDetailDialog}
+          onOpenChange={setShowDetailDialog}
+          shopifyCustomerId={selectedCustomerId}
+          adminPassword={adminPassword}
+        />
+      )}
     </div>
   );
 }
