@@ -13,11 +13,16 @@ export const billingProfileSchema = z.object({
   }),
   taxCode: z.string().nullable().optional().refine((val) => {
     if (!val) return true; // optional
-    // Validazione Codice Fiscale italiano: 16 caratteri alfanumerici
-    const cfRegex = /^[A-Z0-9]{16}$/;
-    return cfRegex.test(val.toUpperCase().replace(/\s/g, ''));
+    const cleaned = val.toUpperCase().replace(/\s/g, '');
+    // Validazione Codice Fiscale italiano:
+    // - Persona fisica: 16 caratteri alfanumerici (es: RSSMRA80A01H501U)
+    // - Persona giuridica/società: 11 cifre numeriche (es: 12345678901)
+    const cfPersonaFisica = /^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$/; // Formato preciso
+    const cfPersonaGiuridica = /^[0-9]{11}$/; // 11 cifre (come P.IVA)
+    const cfGenerico = /^[A-Z0-9]{16}$/; // Fallback generico 16 car
+    return cfPersonaFisica.test(cleaned) || cfPersonaGiuridica.test(cleaned) || cfGenerico.test(cleaned);
   }, {
-    message: 'Codice Fiscale non valido. Deve contenere 16 caratteri alfanumerici',
+    message: 'Codice Fiscale non valido. Deve essere: 16 caratteri alfanumerici (persona fisica) o 11 cifre (persona giuridica)',
   }),
   pec: z.string().email('PEC non valida').nullable().optional().or(z.literal('')),
   sdiCode: z.string().nullable().optional().refine((val) => {

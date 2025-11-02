@@ -199,16 +199,29 @@ export async function POST(request: NextRequest) {
           isBusiness: true,
         };
 
-        const validatedData = billingProfileSchema.parse(billingProfileData);
+        // Validazione con gestione errori dettagliata
+        const validationResult = billingProfileSchema.safeParse(billingProfileData);
+        
+        if (!validationResult.success) {
+          console.error(`❌ Validation failed for customer ${customer.email}:`);
+          validationResult.error.errors.forEach(err => {
+            console.error(`   - ${err.path.join('.')}: ${err.message}`);
+          });
+          console.error(`   Dati ricevuti:`, JSON.stringify(billingProfileData, null, 2));
+          skippedCount++;
+          processedCount++;
+          lastCustomerId = customer.id.toString();
+          continue;
+        }
 
         await prisma.billingProfile.upsert({
           where: {
             userId: user.id,
           },
-          update: validatedData,
+          update: validationResult.data,
           create: {
             userId: user.id,
-            ...validatedData,
+            ...validationResult.data,
           },
         });
         
@@ -217,7 +230,8 @@ export async function POST(request: NextRequest) {
         processedCount++;
         lastCustomerId = customer.id.toString();
       } catch (error) {
-        console.error(`Error syncing customer ${customer.id}:`, error);
+        console.error(`❌ Error syncing customer ${customer.id}:`, error);
+        skippedCount++;
         processedCount++;
         lastCustomerId = customer.id.toString();
       }

@@ -65,21 +65,29 @@ export async function POST(request: NextRequest) {
         isBusiness: true,
       };
 
-      // Validazione con Zod
-      const validatedData = billingProfileSchema.parse(billingProfileData);
-
-      await prisma.billingProfile.upsert({
-        where: {
-          userId: user.id,
-        },
-        update: validatedData,
-        create: {
-          userId: user.id,
-          ...validatedData,
-        },
-      });
+      // Validazione con Zod (gestione errori migliorata)
+      const validationResult = billingProfileSchema.safeParse(billingProfileData);
       
-      console.log(`✅ Business customer ${webhookData.id} (${companyName || 'no company name'}) updated`);
+      if (!validationResult.success) {
+        console.error(`❌ Validation failed for business customer ${webhookData.email}:`);
+        validationResult.error.errors.forEach(err => {
+          console.error(`   - ${err.path.join('.')}: ${err.message}`);
+        });
+        console.log(`⚠️  Business customer ${webhookData.id} updated but billing profile skipped due to validation errors`);
+      } else {
+        await prisma.billingProfile.upsert({
+          where: {
+            userId: user.id,
+          },
+          update: validationResult.data,
+          create: {
+            userId: user.id,
+            ...validationResult.data,
+          },
+        });
+        
+        console.log(`✅ Business customer ${webhookData.id} (${companyName || 'no company name'}) updated`);
+      }
     } else {
       // Se non è più Business, rimuovi il billing profile
       await prisma.billingProfile.deleteMany({
