@@ -12,6 +12,7 @@ interface SyncEvent {
 
 interface SyncProgressProps {
   isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
   totalProcessed: number;
   businessSynced: number;
   privateSkipped: number;
@@ -19,10 +20,13 @@ interface SyncProgressProps {
   estimatedTotal: number;
   events: SyncEvent[];
   isComplete: boolean;
+  isSyncing: boolean;
+  onStop?: () => void;
 }
 
 export function SyncProgressDialog({
   isOpen,
+  onOpenChange,
   totalProcessed,
   businessSynced,
   privateSkipped,
@@ -30,6 +34,8 @@ export function SyncProgressDialog({
   estimatedTotal,
   events,
   isComplete,
+  isSyncing,
+  onStop,
 }: SyncProgressProps) {
   const [progress, setProgress] = useState(0);
 
@@ -41,7 +47,7 @@ export function SyncProgressDialog({
   }, [totalProcessed, estimatedTotal]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -135,6 +141,21 @@ export function SyncProgressDialog({
                   : 'Nessun cliente Business trovato'}
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Pulsante Stop (solo durante sincronizzazione) */}
+        {isSyncing && !isComplete && onStop && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={onStop}
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              Ferma Sincronizzazione
+            </button>
           </div>
         )}
       </DialogContent>

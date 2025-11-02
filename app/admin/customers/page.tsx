@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +54,9 @@ export default function CustomersPage() {
     isComplete: false,
   });
   const [syncEvents, setSyncEvents] = useState<SyncEvent[]>([]);
+  
+  // Ref per controllare lo stop della sincronizzazione
+  const stopSyncRef = useRef(false);
 
   // Recupera password da sessionStorage
   useEffect(() => {
@@ -72,6 +75,20 @@ export default function CustomersPage() {
       loadCustomers();
     }
   }, [page, search, isBusinessFilter, adminPassword]);
+
+  // Warning prima di lasciare la pagina se sync in corso
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (syncing) {
+        e.preventDefault();
+        e.returnValue = '⚠️ Sincronizzazione in corso! Se ricarichi la pagina, il processo sarà interrotto.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [syncing]);
 
   const loadCustomers = async () => {
     try {
@@ -115,12 +132,20 @@ export default function CustomersPage() {
     setSyncEvents(prev => [...prev, { timestamp: new Date(), message, type }]);
   };
 
+  const handleStopSync = () => {
+    if (confirm('⚠️ Sei sicuro di voler fermare la sincronizzazione?\n\nI clienti già sincronizzati rimarranno nel database.')) {
+      stopSyncRef.current = true;
+      addSyncEvent('🛑 Richiesta di stop ricevuta...', 'info');
+    }
+  };
+
   const handleSyncCustomers = async () => {
     if (!confirm('🚀 Vuoi analizzare e sincronizzare TUTTI i clienti Business da Shopify?\n\n⏱️  Per oltre 1000 clienti, l\'operazione può richiedere 10-15 minuti.\n\n📊 Vedrai il progresso in tempo reale.')) {
       return;
     }
 
     // Reset stati e mostra dialog
+    stopSyncRef.current = false; // Reset flag stop
     setSyncing(true);
     setShowSyncDialog(true);
     setSyncProgress({
@@ -146,8 +171,8 @@ export default function CustomersPage() {
 
       addSyncEvent('🔍 Avvio sincronizzazione con cursor pagination...', 'info');
       
-      // Continua finché ci sono altri clienti
-      while (hasMore && batchNumber < MAX_BATCHES) {
+      // Continua finché ci sono altri clienti (o fino a richiesta di stop)
+      while (hasMore && batchNumber < MAX_BATCHES && !stopSyncRef.current) {
         batchNumber++;
         addSyncEvent(`📦 Elaborazione batch #${batchNumber}...`, 'info');
 
@@ -249,10 +274,18 @@ export default function CustomersPage() {
         estimatedTotal: totalProcessed,
       }));
 
-      addSyncEvent(
-        `🎉 Sincronizzazione completata! ${totalSynced} Business, ${totalSkipped} privati, ${batchNumber} batch`,
-        'success'
-      );
+      // Messaggio finale (diverso se fermata manualmente)
+      if (stopSyncRef.current) {
+        addSyncEvent(
+          `🛑 Sincronizzazione fermata manualmente! ${totalSynced} Business, ${totalSkipped} privati, ${batchNumber} batch processati`,
+          'info'
+        );
+      } else {
+        addSyncEvent(
+          `🎉 Sincronizzazione completata! ${totalSynced} Business, ${totalSkipped} privati, ${batchNumber} batch`,
+          'success'
+        );
+      }
       
       // Ricarica la lista clienti dopo 2 secondi
       setTimeout(() => {
@@ -527,9 +560,23 @@ export default function CustomersPage() {
         )}
       </div>
 
+      {/* Pulsante "Mostra Progresso" (visibile solo se dialog chiuso ma sync in corso) */}
+      {syncing && !showSyncDialog && (
+        <button
+          onClick={() => setShowSyncDialog(true)}
+          className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-pulse z-50"
+        >
+          <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Mostra Progresso Sincronizzazione
+        </button>
+      )}
+
       {/* Dialog Timeline Real-Time */}
       <SyncProgressDialog
         isOpen={showSyncDialog}
+        onOpenChange={setShowSyncDialog}
         totalProcessed={syncProgress.totalProcessed}
         businessSynced={syncProgress.businessSynced}
         privateSkipped={syncProgress.privateSkipped}
@@ -537,6 +584,8 @@ export default function CustomersPage() {
         estimatedTotal={syncProgress.estimatedTotal}
         events={syncEvents}
         isComplete={syncProgress.isComplete}
+        isSyncing={syncing}
+        onStop={handleStopSync}
       />
     </div>
   );
