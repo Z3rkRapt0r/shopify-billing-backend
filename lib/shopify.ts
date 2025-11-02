@@ -46,14 +46,29 @@ export class ShopifyAdminClient {
       throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    
+    // 🔄 Estrai page_info dal Link header per cursor pagination
+    const linkHeader = response.headers.get('Link');
+    let pageInfo = null;
+    
+    if (linkHeader) {
+      // Parse: <https://.../customers.json?page_info=xyz>; rel="next"
+      const nextMatch = linkHeader.match(/page_info=([^>&\s]+)/);
+      if (nextMatch) {
+        pageInfo = nextMatch[1];
+        console.log(`📄 page_info trovato: ${pageInfo.substring(0, 20)}...`);
+      }
+    }
+    
+    return { ...data, _pageInfo: pageInfo };
   }
 
-  // Ottenere clienti (paginato)
-  async getCustomers(params: { limit?: number; since_id?: string } = {}) {
+  // Ottenere clienti (paginato con cursor)
+  async getCustomers(params: { limit?: number; page_info?: string } = {}) {
     const searchParams = new URLSearchParams();
     if (params.limit) searchParams.append('limit', params.limit.toString());
-    if (params.since_id) searchParams.append('since_id', params.since_id);
+    if (params.page_info) searchParams.append('page_info', params.page_info);
 
     const endpoint = `/customers.json?${searchParams.toString()}`;
     return this.makeRequest(endpoint);

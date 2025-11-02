@@ -15,29 +15,31 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { limit = 50, since_id } = body;
+    const { limit = 50, page_info } = body;
 
     const shopifyClient = createShopifyClient();
     let syncedCount = 0; // Clienti Business sincronizzati
     let processedCount = 0; // Clienti totali processati
     let skippedCount = 0; // Clienti privati saltati
-    let lastCustomerId = since_id;
+    let lastCustomerId: string | undefined = undefined;
 
     // Funzione helper per delay (evita 429)
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     // ⚠️ IMPORTANTE: Fare UNA SOLA chiamata a Shopify per batch
     // Il frontend gestisce il loop per tutti i clienti
-    console.log(`🔍 Richiesta Shopify: limit=${limit}, since_id=${lastCustomerId || 'none'}`);
+    console.log(`🔍 Richiesta Shopify: limit=${limit}, page_info=${page_info ? page_info.substring(0, 20) + '...' : 'none'}`);
     
     const response = await shopifyClient.getCustomers({
       limit: limit, // Richiedi il numero esatto di clienti
-      since_id: lastCustomerId,
+      page_info: page_info,
     });
 
     const customers = response.customers || [];
+    const nextPageInfo = response._pageInfo;
     
     console.log(`📦 Ricevuti ${customers.length} clienti da Shopify (limit: ${limit})`);
+    console.log(`   nextPageInfo: ${nextPageInfo ? 'presente' : 'assente'}`);
     
     if (customers.length > 0) {
       const firstId = customers[0].id;
@@ -142,20 +144,22 @@ export async function POST(request: NextRequest) {
     }
 
     // ✅ Determina se ci sono altri clienti:
-    // Se Shopify ha restituito meno clienti del limite richiesto,
-    // significa che siamo arrivati alla fine
-    const hasMore = customers.length === limit;
+    // Se Shopify ha restituito page_info, ci sono altri clienti
+    const hasMore = !!nextPageInfo;
 
     console.log(`✅ Batch completato: processati=${processedCount}, synced=${syncedCount}, skipped=${skippedCount}`);
-    console.log(`   hasMore=${hasMore} (ricevuti ${customers.length} su limit ${limit})`);
-    console.log(`   lastCustomerId=${lastCustomerId}`);
+    console.log(`   hasMore=${hasMore} (nextPageInfo ${nextPageInfo ? 'presente' : 'assente'})`);
+    if (lastCustomerId) {
+      console.log(`   lastCustomerId=${lastCustomerId}`);
+    }
     
     return NextResponse.json({
       success: true,
       syncedCount, // Clienti Business sincronizzati
       processedCount, // Totale clienti processati
       skippedCount, // Clienti privati saltati
-      lastCustomerId,
+      pageInfo: nextPageInfo, // Page info per il prossimo batch
+      lastCustomerId, // Manteniamo per compatibilità
       hasMore,
     });
 

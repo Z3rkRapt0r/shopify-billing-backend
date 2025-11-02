@@ -173,10 +173,10 @@ export default function AdminDashboard() {
       let totalProcessed = 0;
       let totalSkipped = 0;
       let hasMore = true;
-      let lastCustomerId: string | undefined = undefined;
+      let pageInfo: string | undefined = undefined;
       let batchNumber = 0;
 
-      addSyncEvent('🔍 Recupero conteggio totale clienti da Shopify...', 'info');
+      addSyncEvent('🔍 Avvio sincronizzazione con cursor pagination...', 'info');
       
       // Continua finché ci sono altri clienti (NESSUN LIMITE!)
       while (hasMore) {
@@ -191,7 +191,7 @@ export default function AdminDashboard() {
           },
           body: JSON.stringify({ 
             limit: 50,
-            since_id: lastCustomerId,
+            page_info: pageInfo,
           }),
         });
 
@@ -207,7 +207,7 @@ export default function AdminDashboard() {
           processedCount: data.processedCount,
           skippedCount: data.skippedCount,
           hasMore: data.hasMore,
-          lastCustomerId: data.lastCustomerId,
+          pageInfo: data.pageInfo ? 'presente' : 'assente',
         });
         
         // Accumula statistiche
@@ -216,9 +216,9 @@ export default function AdminDashboard() {
         totalSkipped += data.skippedCount || 0;
         
         hasMore = data.hasMore;
-        lastCustomerId = data.lastCustomerId;
+        pageInfo = data.pageInfo;
         
-        console.log(`   ➡️  hasMore=${hasMore}, continua=${hasMore ? 'SÌ' : 'NO'}`);
+        console.log(`   ➡️  hasMore=${hasMore}, continua=${hasMore ? 'SÌ' : 'NO'}, pageInfo=${pageInfo ? 'presente' : 'assente'}`);
 
         // Aggiorna progresso in tempo reale
         setSyncProgress({
