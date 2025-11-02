@@ -161,8 +161,16 @@ export function createShopifyClient(): ShopifyAdminClient {
 export function parseCustomerWebhook(body: any): ShopifyCustomerWebhook {
   try {
     return shopifyCustomerWebhookSchema.parse(body);
-  } catch (error) {
-    console.error('Errore nel parsing webhook customer:', error);
+  } catch (error: any) {
+    console.error('❌ Errore nel parsing webhook customer:');
+    if (error.errors) {
+      error.errors.forEach((err: any) => {
+        console.error(`   - ${err.path.join('.')}: ${err.message} (received: ${err.received})`);
+      });
+    } else {
+      console.error(error);
+    }
+    console.error('   Webhook body ricevuto:', JSON.stringify(body, null, 2));
     throw new Error('Webhook customer non valido');
   }
 }
@@ -171,8 +179,16 @@ export function parseCustomerWebhook(body: any): ShopifyCustomerWebhook {
 export function parseOrderWebhook(body: any): ShopifyOrderWebhook {
   try {
     return shopifyOrderWebhookSchema.parse(body);
-  } catch (error) {
-    console.error('Errore nel parsing webhook order:', error);
+  } catch (error: any) {
+    console.error('❌ Errore nel parsing webhook order:');
+    if (error.errors) {
+      error.errors.forEach((err: any) => {
+        console.error(`   - ${err.path.join('.')}: ${err.message} (received: ${err.received})`);
+      });
+    } else {
+      console.error(error);
+    }
+    console.error('   Webhook body ricevuto:', JSON.stringify(body, null, 2));
     throw new Error('Webhook order non valido');
   }
 }
