@@ -22,9 +22,28 @@ export async function POST(request: NextRequest) {
     let processedCount = 0; // Clienti totali processati
     let skippedCount = 0; // Clienti privati saltati
     let lastCustomerId: string | undefined = undefined;
+    const processedIds = new Set<string>(); // Track IDs già processati
 
     // Funzione helper per delay (evita 429)
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    
+    // Retry con backoff esponenziale per 429
+    const retryWithBackoff = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> => {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await fn();
+        } catch (error: any) {
+          if (error.message?.includes('429') && i < maxRetries - 1) {
+            const waitTime = Math.pow(2, i) * 1000; // 1s, 2s, 4s
+            console.log(`⏳ 429 Rate limit, retry ${i + 1}/${maxRetries} dopo ${waitTime}ms...`);
+            await delay(waitTime);
+          } else {
+            throw error;
+          }
+        }
+      }
+      throw new Error('Max retries reached');
+    };
 
     // ⚠️ IMPORTANTE: Fare UNA SOLA chiamata a Shopify per batch
     // Il frontend gestisce il loop per tutti i clienti
@@ -57,11 +76,23 @@ export async function POST(request: NextRequest) {
     // Processa TUTTI i clienti ricevuti da questo batch
     for (const customer of customers) {
       try {
-        // Delay di 300ms tra le chiamate per evitare 429 (max 3 richieste/secondo)
-        await delay(300);
+        const customerId = customer.id.toString();
         
-      // Recupera metafields del cliente
-      const metafieldsResponse = await shopifyClient.getCustomerMetafields(customer.id.toString());
+        // 🔍 IMPORTANTE: Verifica duplicati tra batch
+        if (processedIds.has(customerId)) {
+          console.warn(`⚠️  Cliente duplicato trovato: ${customerId} - SKIP`);
+          processedCount++;
+          continue;
+        }
+        processedIds.add(customerId);
+        
+        // ⏱️  Delay di 600ms tra le chiamate (rispetta 2 req/sec di Shopify)
+        await delay(600);
+        
+      // Recupera metafields del cliente con retry automatico per 429
+      const metafieldsResponse = await retryWithBackoff(() => 
+        shopifyClient.getCustomerMetafields(customerId)
+      );
       const metafields = metafieldsResponse.metafields || [];
       
       // Estrai dati di fatturazione dai metafields
@@ -154,8 +185,14 @@ export async function POST(request: NextRequest) {
     // Se Shopify ha restituito page_info, ci sono altri clienti
     const hasMore = !!nextPageInfo;
 
+    const duplicatesFound = processedIds.size < processedCount;
+    
     console.log(`✅ Batch completato: processati=${processedCount}, synced=${syncedCount}, skipped=${skippedCount}`);
+    console.log(`   IDs unici nel batch: ${processedIds.size}`);
     console.log(`   hasMore=${hasMore} (nextPageInfo ${nextPageInfo ? 'presente' : 'assente'})`);
+    if (duplicatesFound) {
+      console.warn(`   ⚠️  Duplicati trovati: ${processedCount - processedIds.size} clienti ripetuti`);
+    }
     if (lastCustomerId) {
       console.log(`   lastCustomerId=${lastCustomerId}`);
     }
@@ -168,6 +205,7 @@ export async function POST(request: NextRequest) {
       pageInfo: nextPageInfo, // Page info per il prossimo batch
       lastCustomerId, // Manteniamo per compatibilità
       hasMore,
+      duplicatesInBatch: duplicatesFound,
     });
 
   } catch (error) {

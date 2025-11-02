@@ -217,14 +217,21 @@ export default function CustomersPage() {
           break;
         }
         
-        // Verifica limite di sicurezza
+        // Verifica limite di sicurezza batch
         if (batchNumber >= MAX_BATCHES) {
           addSyncEvent(`⚠️  Raggiunto limite di sicurezza (${MAX_BATCHES} batch). Contatta supporto se hai più di 2500 clienti.`, 'error');
           break;
         }
+        
+        // Verifica se stiamo processando troppi clienti (possibile loop)
+        if (totalProcessed > 1500) {
+          addSyncEvent(`⚠️  ATTENZIONE: Processati ${totalProcessed} clienti. Possibile loop! Fermato per sicurezza.`, 'error');
+          console.error(`Loop detection: ${totalProcessed} clienti processati, troppi!`);
+          break;
+        }
 
-        // Pausa tra i batch per rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Pausa tra i batch per rate limiting (aumentato per 429)
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
       // Completa sincronizzazione
