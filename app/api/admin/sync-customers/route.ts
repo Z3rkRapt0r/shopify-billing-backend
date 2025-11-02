@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
 
     // ⚠️ IMPORTANTE: Fare UNA SOLA chiamata a Shopify per batch
     // Il frontend gestisce il loop per tutti i clienti
+    console.log(`🔍 Richiesta Shopify: limit=${limit}, since_id=${lastCustomerId || 'none'}`);
+    
     const response = await shopifyClient.getCustomers({
       limit: limit, // Richiedi il numero esatto di clienti
       since_id: lastCustomerId,
@@ -36,6 +38,12 @@ export async function POST(request: NextRequest) {
     const customers = response.customers || [];
     
     console.log(`📦 Ricevuti ${customers.length} clienti da Shopify (limit: ${limit})`);
+    
+    if (customers.length > 0) {
+      const firstId = customers[0].id;
+      const lastId = customers[customers.length - 1].id;
+      console.log(`   Range ID: ${firstId} → ${lastId}`);
+    }
 
     // Processa TUTTI i clienti ricevuti da questo batch
     for (const customer of customers) {
@@ -138,7 +146,10 @@ export async function POST(request: NextRequest) {
     // significa che siamo arrivati alla fine
     const hasMore = customers.length === limit;
 
-    console.log(`Processed ${processedCount} customers: ${syncedCount} Business synced, ${skippedCount} private skipped`);
+    console.log(`✅ Batch completato: processati=${processedCount}, synced=${syncedCount}, skipped=${skippedCount}`);
+    console.log(`   hasMore=${hasMore} (ricevuti ${customers.length} su limit ${limit})`);
+    console.log(`   lastCustomerId=${lastCustomerId}`);
+    
     return NextResponse.json({
       success: true,
       syncedCount, // Clienti Business sincronizzati

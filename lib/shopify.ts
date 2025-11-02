@@ -210,14 +210,14 @@ export function extractBillingDataFromMetafields(metafields: any[]): BillingMeta
   const billingData: BillingMetafields = {};
   let hasAnyField = false;
 
-  // 🔍 DEBUG: Log tutti i metafields per capire la struttura
-  console.log(`🔍 Metafields ricevuti (${metafields.length}):`, JSON.stringify(metafields, null, 2));
+  // 🔍 DEBUG: Log ridotto (solo se ci sono metafields)
+  if (metafields.length > 0) {
+    console.log(`🔍 Metafields trovati (${metafields.length}): ${metafields.map(m => m.key).join(', ')}`);
+  }
 
   for (const metafield of metafields) {
     // Supporta sia "custom" che altri namespace
     const key = metafield.key.toLowerCase().replace(/_/g, '');
-    
-    console.log(`  🔑 Key: "${key}", Value: "${metafield.value}", Type: "${metafield.type}"`);
     
     switch (key) {
       case 'fatturaautomaticamente':

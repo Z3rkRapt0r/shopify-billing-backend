@@ -201,6 +201,15 @@ export default function AdminDashboard() {
 
         const data = await response.json();
         
+        // 🔍 DEBUG: Log risposta backend
+        console.log(`📥 Batch #${batchNumber} risposta:`, {
+          syncedCount: data.syncedCount,
+          processedCount: data.processedCount,
+          skippedCount: data.skippedCount,
+          hasMore: data.hasMore,
+          lastCustomerId: data.lastCustomerId,
+        });
+        
         // Accumula statistiche
         totalSynced += data.syncedCount || 0;
         totalProcessed += data.processedCount || 0;
@@ -208,6 +217,8 @@ export default function AdminDashboard() {
         
         hasMore = data.hasMore;
         lastCustomerId = data.lastCustomerId;
+        
+        console.log(`   ➡️  hasMore=${hasMore}, continua=${hasMore ? 'SÌ' : 'NO'}`);
 
         // Aggiorna progresso in tempo reale
         setSyncProgress({
