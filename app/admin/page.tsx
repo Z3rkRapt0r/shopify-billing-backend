@@ -1,0 +1,405 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+interface KpiData {
+  totalUsers: number;
+  businessUsers: number;
+  totalOrders: number;
+  pendingInvoices: number;
+  issuedInvoices: number;
+  errorInvoices: number;
+  foreignOrders: number;
+}
+
+interface Order {
+  id: string;
+  shopifyOrderId: string;
+  orderNumber: string;
+  currency: string;
+  totalPrice: number;
+  createdAt: string;
+  hasVatProfile: boolean;
+  invoiceStatus: 'PENDING' | 'ISSUED' | 'ERROR' | 'FOREIGN';
+  invoiceId?: string;
+  invoiceDate?: string;
+  lastError?: string;
+  user: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    billingProfile?: {
+      companyName?: string;
+      vatNumber?: string;
+      isBusiness: boolean;
+    };
+  };
+}
+
+export default function AdminDashboard() {
+  const [kpiData, setKpiData] = useState<KpiData>({
+    totalUsers: 0,
+    businessUsers: 0,
+    totalOrders: 0,
+    pendingInvoices: 0,
+    issuedInvoices: 0,
+    errorInvoices: 0,
+    foreignOrders: 0,
+  });
+  
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [issuingInvoice, setIssuingInvoice] = useState<string | null>(null);
+
+  // Carica dati KPI
+  useEffect(() => {
+    loadKpiData();
+    loadRecentOrders();
+  }, []);
+
+  const loadKpiData = async () => {
+    try {
+      const response = await fetch('/api/admin/orders/stats', {
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore nel caricamento dati KPI');
+      }
+
+      const data = await response.json();
+      setKpiData(data);
+    } catch (err) {
+      console.error('Error loading KPI data:', err);
+      setError('Errore nel caricamento dati KPI');
+    }
+  };
+
+  const loadRecentOrders = async () => {
+    try {
+      const response = await fetch('/api/admin/orders?limit=10', {
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore nel caricamento ordini');
+      }
+
+      const data = await response.json();
+      setOrders(data.orders);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error loading orders:', err);
+      setError('Errore nel caricamento ordini');
+      setLoading(false);
+    }
+  };
+
+  const handleSyncCustomers = async () => {
+    setSyncing(true);
+    try {
+      const response = await fetch('/api/admin/sync-customers', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ limit: 50 }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante la sincronizzazione');
+      }
+
+      const data = await response.json();
+      alert(`Sincronizzati ${data.syncedCount} clienti da Shopify`);
+      
+      // Ricarica i dati
+      loadKpiData();
+    } catch (err) {
+      console.error('Error syncing customers:', err);
+      alert('Errore durante la sincronizzazione dei clienti');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleIssueInvoice = async (shopifyOrderId: string) => {
+    setIssuingInvoice(shopifyOrderId);
+    try {
+      const response = await fetch('/api/invoices/issue', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin'}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ shopifyOrderId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Errore durante emissione fattura');
+      }
+
+      const data = await response.json();
+      alert(`Fattura emessa: ${data.invoiceId}`);
+      
+      // Ricarica gli ordini
+      loadRecentOrders();
+      loadKpiData();
+    } catch (err) {
+      console.error('Error issuing invoice:', err);
+      alert(err instanceof Error ? err.message : 'Errore durante emissione fattura');
+    } finally {
+      setIssuingInvoice(null);
+    }
+  };
+
+  const getInvoiceStatusBadge = (status: string) => {
+    switch (status) {
+      case 'ISSUED':
+        return <Badge variant="success">Emessa</Badge>;
+      case 'PENDING':
+        return <Badge variant="warning">In Attesa</Badge>;
+      case 'ERROR':
+        return <Badge variant="destructive">Errore</Badge>;
+      case 'FOREIGN':
+        return <Badge variant="info">Estero</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Caricamento dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Dashboard Amministrazione
+          </h1>
+          <p className="mt-2 text-gray-600">
+            Gestione fatturazione e clienti Shopify
+          </p>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-600">{error}</p>
+          </div>
+        )}
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Clienti Totali
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{kpiData.totalUsers}</div>
+              <p className="text-xs text-muted-foreground">
+                {kpiData.businessUsers} aziendali
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Ordini Totali
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{kpiData.totalOrders}</div>
+              <p className="text-xs text-muted-foreground">
+                {kpiData.foreignOrders} esteri
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Fatture Emesse
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{kpiData.issuedInvoices}</div>
+              <p className="text-xs text-muted-foreground">
+                {kpiData.pendingInvoices} in attesa
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Errori Fatturazione
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{kpiData.errorInvoices}</div>
+              <p className="text-xs text-muted-foreground">
+                Richiedono attenzione
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Azioni Rapide */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Azioni Rapide</CardTitle>
+            <CardDescription>
+              Operazioni comuni di gestione
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4">
+              <Button 
+                onClick={handleSyncCustomers}
+                disabled={syncing}
+                variant="outline"
+              >
+                {syncing ? 'Sincronizzazione...' : 'Sincronizza Clienti Shopify'}
+              </Button>
+              <Button 
+                onClick={() => window.location.href = '/admin/orders'}
+                variant="outline"
+              >
+                Gestione Ordini
+              </Button>
+              <Button 
+                onClick={() => window.location.href = '/admin/customers'}
+                variant="outline"
+              >
+                Gestione Clienti
+              </Button>
+              <Button 
+                onClick={() => window.location.href = '/admin/credit-notes'}
+                variant="outline"
+              >
+                Note di Credito
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Ordini Recenti */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Ordini Recenti</CardTitle>
+            <CardDescription>
+              Ultimi 10 ordini con stato fatturazione
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ordine</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Totale</TableHead>
+                  <TableHead>P.IVA</TableHead>
+                  <TableHead>Stato Fattura</TableHead>
+                  <TableHead>Azioni</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell className="font-medium">
+                      {order.orderNumber}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">
+                          {order.user.firstName} {order.user.lastName}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {order.user.email}
+                        </div>
+                        {order.user.billingProfile?.companyName && (
+                          <div className="text-sm text-gray-500">
+                            {order.user.billingProfile.companyName}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {new Intl.NumberFormat('it-IT', {
+                        style: 'currency',
+                        currency: order.currency || 'EUR',
+                      }).format(order.totalPrice)}
+                    </TableCell>
+                    <TableCell>
+                      {order.hasVatProfile ? (
+                        <Badge variant="success">Sì</Badge>
+                      ) : (
+                        <Badge variant="secondary">No</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {getInvoiceStatusBadge(order.invoiceStatus)}
+                      {order.lastError && (
+                        <div className="text-xs text-red-500 mt-1">
+                          {order.lastError}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {order.invoiceStatus === 'PENDING' && order.hasVatProfile && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleIssueInvoice(order.shopifyOrderId)}
+                          disabled={issuingInvoice === order.shopifyOrderId}
+                        >
+                          {issuingInvoice === order.shopifyOrderId ? 'Emissione...' : 'Emetti Fattura'}
+                        </Button>
+                      )}
+                      {order.invoiceStatus === 'ISSUED' && order.invoiceId && (
+                        <Button size="sm" variant="outline" disabled>
+                          Fattura: {order.invoiceId}
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            
+            {orders.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                Nessun ordine trovato
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,112 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  shopifyCustomerId String   @unique
+  email             String   @unique
+  firstName         String?
+  lastName          String?
+  countryCode       String?  // ISO2 del profilo Shopify
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  billingProfile    BillingProfile?
+  orders            OrderSnapshot[]
+
+  @@index([shopifyCustomerId])
+  @@index([email])
+}
+
+model BillingProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  companyName        String?
+  vatNumber          String?  // P.IVA
+  taxCode            String?  // Codice Fiscale
+  pec                String?
+  sdiCode            String?  // Codice Destinatario (7 char)
+  addressLine1       String?
+  addressLine2       String?
+  city               String?
+  province           String?
+  postalCode         String?
+  countryCode        String?  // deve essere "IT" per emettere
+  isBusiness         Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user               User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([vatNumber])
+  @@index([countryCode])
+}
+
+model OrderSnapshot {
+  id                String   @id @default(cuid())
+  userId            String
+  shopifyOrderId    String   @unique
+  orderNumber       String?
+  currency          String?
+  totalPrice        Decimal? @db.Decimal(18,2)
+  createdAt         DateTime @default(now())
+  shopifyCreatedAt  DateTime?
+  hasVatProfile     Boolean  @default(false) // deriva da BillingProfile.isBusiness && vatNumber
+  invoiceStatus     InvoiceStatus @default(PENDING) // PENDING, ISSUED, ERROR, FOREIGN
+  invoiceId         String?  // id restituito da OpenAPI SDI
+  invoiceDate       DateTime?
+  lastError         String?
+
+  user              User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([shopifyOrderId])
+  @@index([invoiceStatus])
+  @@index([countryCode])
+}
+
+enum InvoiceStatus {
+  PENDING
+  ISSUED
+  ERROR
+  FOREIGN
+}
+
+model CreditNote {
+  id               String   @id @default(cuid())
+  orderId          String
+  reason           String?
+  totalAmount      Decimal? @db.Decimal(18,2)
+  sdiCreditId      String?
+  status           String?  // PENDING/ISSUED/ERROR
+  createdAt        DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model QueueJob {
+  id          String   @id @default(cuid())
+  type        String   // 'invoice', 'credit_note', 'sync_customers'
+  payload     Json     // payload JSON per il job
+  status      String   @default(PENDING) // PENDING, PROCESSING, COMPLETED, FAILED
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  lastError   String?
+  scheduledAt DateTime @default(now())
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+  @@index([type])
+  @@index([scheduledAt])
+}
