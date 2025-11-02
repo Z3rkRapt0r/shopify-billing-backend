@@ -7,6 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SyncProgressDialog } from '@/components/SyncProgressDialog';
+
+interface SyncEvent {
+  timestamp: Date;
+  message: string;
+  type: 'info' | 'success' | 'error';
+}
 
 interface KpiData {
   totalUsers: number;
@@ -64,6 +71,18 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [issuingInvoice, setIssuingInvoice] = useState<string | null>(null);
+
+  // Stati per Timeline Real-Time
+  const [showSyncDialog, setShowSyncDialog] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({
+    totalProcessed: 0,
+    businessSynced: 0,
+    privateSkipped: 0,
+    currentBatch: 0,
+    estimatedTotal: 0,
+    isComplete: false,
+  });
+  const [syncEvents, setSyncEvents] = useState<SyncEvent[]>([]);
 
   // Recupera password da sessionStorage all'avvio
   useEffect(() => {
@@ -125,12 +144,30 @@ export default function AdminDashboard() {
     }
   };
 
+  const addSyncEvent = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    setSyncEvents(prev => [...prev, { timestamp: new Date(), message, type }]);
+  };
+
   const handleSyncCustomers = async () => {
-    if (!confirm('Vuoi sincronizzare TUTTI i clienti Business da Shopify?\n\nQuesta operazione può richiedere diversi minuti.')) {
+    if (!confirm('🚀 Vuoi analizzare e sincronizzare TUTTI i clienti Business da Shopify?\n\n⏱️  Per oltre 1000 clienti, l\'operazione può richiedere 10-15 minuti.\n\n📊 Vedrai il progresso in tempo reale.')) {
       return;
     }
 
+    // Reset stati e mostra dialog
     setSyncing(true);
+    setShowSyncDialog(true);
+    setSyncProgress({
+      totalProcessed: 0,
+      businessSynced: 0,
+      privateSkipped: 0,
+      currentBatch: 0,
+      estimatedTotal: 0,
+      isComplete: false,
+    });
+    setSyncEvents([]);
+
+    addSyncEvent('🎬 Avvio sincronizzazione...', 'info');
+
     try {
       let totalSynced = 0;
       let totalProcessed = 0;
@@ -139,10 +176,12 @@ export default function AdminDashboard() {
       let lastCustomerId: string | undefined = undefined;
       let batchNumber = 0;
 
-      // Continua finché ci sono altri clienti
+      addSyncEvent('🔍 Recupero conteggio totale clienti da Shopify...', 'info');
+      
+      // Continua finché ci sono altri clienti (NESSUN LIMITE!)
       while (hasMore) {
         batchNumber++;
-        console.log(`Sincronizzazione batch ${batchNumber}...`);
+        addSyncEvent(`📦 Elaborazione batch #${batchNumber}...`, 'info');
 
         const response: Response = await fetch('/api/admin/sync-customers', {
           method: 'POST',
@@ -170,30 +209,60 @@ export default function AdminDashboard() {
         hasMore = data.hasMore;
         lastCustomerId = data.lastCustomerId;
 
-        console.log(`Batch ${batchNumber}: ${data.syncedCount} Business, ${data.skippedCount} privati`);
+        // Aggiorna progresso in tempo reale
+        setSyncProgress({
+          totalProcessed,
+          businessSynced: totalSynced,
+          privateSkipped: totalSkipped,
+          currentBatch: batchNumber,
+          estimatedTotal: hasMore ? totalProcessed + 50 : totalProcessed,
+          isComplete: false,
+        });
+
+        // Log eventi
+        if (data.syncedCount > 0) {
+          addSyncEvent(
+            `✅ Batch #${batchNumber}: ${data.syncedCount} clienti Business sincronizzati, ${data.skippedCount} privati saltati`,
+            'success'
+          );
+        } else {
+          addSyncEvent(
+            `⏭️  Batch #${batchNumber}: ${data.skippedCount} clienti privati saltati (nessun Business)`,
+            'info'
+          );
+        }
 
         // Se non ci sono più clienti, fermati
         if (!hasMore) {
+          addSyncEvent(`🏁 Tutti i clienti sono stati analizzati!`, 'success');
           break;
         }
 
-        // Pausa tra i batch per non sovraccaricare
+        // Pausa tra i batch per rate limiting
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      alert(
-        `✅ Sincronizzazione COMPLETA!\n\n` +
-        `📊 Totale clienti processati: ${totalProcessed}\n` +
-        `✅ Clienti Business sincronizzati: ${totalSynced}\n` +
-        `⏭️  Clienti privati saltati: ${totalSkipped}\n\n` +
-        `🔄 Batch completati: ${batchNumber}`
+      // Completa sincronizzazione
+      setSyncProgress(prev => ({
+        ...prev,
+        isComplete: true,
+        estimatedTotal: totalProcessed,
+      }));
+
+      addSyncEvent(
+        `🎉 Sincronizzazione completata! ${totalSynced} Business, ${totalSkipped} privati, ${batchNumber} batch`,
+        'success'
       );
       
-      // Ricarica i dati
-      loadKpiData();
+      // Ricarica i dati dopo 2 secondi
+      setTimeout(() => {
+        loadKpiData();
+      }, 2000);
+
     } catch (err) {
       console.error('Error syncing customers:', err);
-      alert('Errore durante la sincronizzazione dei clienti');
+      addSyncEvent(`❌ Errore: ${err instanceof Error ? err.message : 'Errore sconosciuto'}`, 'error');
+      setSyncProgress(prev => ({ ...prev, isComplete: true }));
     } finally {
       setSyncing(false);
     }
@@ -527,6 +596,18 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog Timeline Real-Time */}
+      <SyncProgressDialog
+        isOpen={showSyncDialog}
+        totalProcessed={syncProgress.totalProcessed}
+        businessSynced={syncProgress.businessSynced}
+        privateSkipped={syncProgress.privateSkipped}
+        currentBatch={syncProgress.currentBatch}
+        estimatedTotal={syncProgress.estimatedTotal}
+        events={syncEvents}
+        isComplete={syncProgress.isComplete}
+      />
     </div>
   );
 }
