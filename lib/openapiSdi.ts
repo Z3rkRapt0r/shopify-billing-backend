@@ -64,8 +64,12 @@ export class OpenAPISDIClient {
   private token: string;
 
   constructor() {
-    this.baseUrl = process.env.OPENAPI_SDI_BASE_URL || 'https://test.sdi.openapi.it';
+    const baseUrl = process.env.OPENAPI_SDI_BASE_URL || 'https://test.sdi.openapi.it';
+    // Assicurati che l'URL abbia il protocollo
+    this.baseUrl = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
     this.token = process.env.OPENAPI_SDI_TOKEN || '';
+
+    console.log(`🔧 OpenAPI SDI Configurato: baseUrl=${this.baseUrl}, token=${this.token ? 'Configurato' : 'NO'}`);
 
     if (!this.token) {
       console.warn('⚠️  OPENAPI_SDI_TOKEN non configurato - Modalità MOCK attiva');
@@ -94,7 +98,6 @@ export class OpenAPISDIClient {
       console.log(`📡 Chiamata OpenAPI SDI: ${endpoint}`);
       console.log(`   URL: ${url}`);
       console.log(`   Token configurato: ${this.token ? 'Sì (' + this.token.substring(0, 20) + '...)' : 'NO'}`);
-      console.log(`   Payload completo:`, JSON.stringify(data, null, 2));
       
       const response = await fetch(url, {
         method: 'POST',
