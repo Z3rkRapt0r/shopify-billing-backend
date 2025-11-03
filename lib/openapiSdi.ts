@@ -125,45 +125,201 @@ export class OpenAPISDIClient {
     }
   }
 
-  // Emetti fattura elettronica
-  async issueInvoice(invoiceData: InvoiceData): Promise<{ id: string; date: string }> {
-    const payload = {
-      supplier: {
-        vat_number: invoiceData.supplier.vatNumber,
-        tax_code: invoiceData.supplier.taxCode,
-        company_name: invoiceData.supplier.companyName,
-        address: invoiceData.supplier.address,
-      },
-      customer: {
-        vat_number: invoiceData.customer.vatNumber,
-        tax_code: invoiceData.customer.taxCode,
-        company_name: invoiceData.customer.companyName,
-        first_name: invoiceData.customer.firstName,
-        last_name: invoiceData.customer.lastName,
-        address: invoiceData.customer.address,
-        pec: invoiceData.customer.pec,
-        sdi_code: invoiceData.customer.sdiCode,
-      },
-      invoice: {
-        number: invoiceData.number,
-        date: invoiceData.date.toISOString().split('T')[0],
-        items: invoiceData.items.map(item => ({
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          vat_rate: item.vatRate,
-          total_amount: item.totalAmount,
-        })),
-        total_amount: invoiceData.totalAmount,
-        total_vat: invoiceData.totalVat,
-        payment_method: invoiceData.paymentMethod,
-        payment_due_date: invoiceData.paymentDueDate?.toISOString().split('T')[0],
-      },
+  private async makeRequestXML(endpoint: string, xmlData: string): Promise<any> {
+    // Mock mode se token non configurato
+    if (!this.token) {
+      console.log('🎭 MOCK MODE OpenAPI SDI attivo (XML)');
+      console.log(`   Endpoint: ${endpoint}`);
+      console.log(`   XML: ${xmlData.substring(0, 200)}...`);
+      return {
+        data: { uuid: `MOCK-${Date.now()}` },
+        date: new Date().toISOString(),
+        status: 'issued',
+      };
+    }
+
+    const url = `${this.baseUrl}${endpoint}`;
+    
+    try {
+      console.log(`📡 Chiamata OpenAPI SDI (XML): ${endpoint}`);
+      console.log(`   URL: ${url}`);
+      console.log(`   Token configurato: ${this.token ? 'Sì (' + this.token.substring(0, 20) + '...)' : 'NO'}`);
+      console.log(`   XML length: ${xmlData.length} bytes`);
+      console.log(`   XML preview: ${xmlData.substring(0, 500)}...`);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/xml',
+        },
+        body: xmlData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ OpenAPI SDI Error: ${response.status} ${response.statusText}`);
+        console.error(`   Response body: ${errorText.substring(0, 500)}`);
+        throw new Error(`OpenAPI SDI error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ OpenAPI SDI Success (XML): ${JSON.stringify(result).substring(0, 200)}...`);
+      return result;
+    } catch (error) {
+      console.error('Errore chiamata OpenAPI SDI (XML):', error);
+      throw error;
+    }
+  }
+
+  // Genera XML fattura elettronica PA
+  private generateFatturaXML(invoiceData: InvoiceData): string {
+    const progressivoInvio = `INV-${Date.now()}`;
+    const dataFattura = invoiceData.date.toISOString().split('T')[0];
+    const supplierVatCode = invoiceData.supplier.vatNumber.replace(/\D/g, '');
+    const customerVatCode = invoiceData.customer.vatNumber?.replace(/\D/g, '') || '';
+    
+    // Escape XML per descrizioni e testi
+    const escapeXML = (str: string) => {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
     };
 
-    const result = await this.makeRequest('/invoices', payload);
+    // Genera righe dettaglio
+    let dettaglioLinee = '';
+    let totaleImponibile = 0;
+    let totaleImposta = 0;
+
+    invoiceData.items.forEach((item, index) => {
+      const imponibile = item.totalAmount / (1 + item.vatRate / 100);
+      const imposta = item.totalAmount - imponibile;
+      totaleImponibile += imponibile;
+      totaleImposta += imposta;
+
+      dettaglioLinee += `
+            <DettaglioLinee>
+                <NumeroLinea>${index + 1}</NumeroLinea>
+                <Descrizione>${escapeXML(item.description)}</Descrizione>
+                <Quantita>${item.quantity.toFixed(2)}</Quantita>
+                <PrezzoUnitario>${item.unitPrice.toFixed(2)}</PrezzoUnitario>
+                <PrezzoTotale>${imponibile.toFixed(2)}</PrezzoTotale>
+                <AliquotaIVA>${item.vatRate.toFixed(2)}</AliquotaIVA>
+            </DettaglioLinee>`;
+    });
+
+    // Raggruppa IVA per aliquote
+    const ivaGroups: { [key: number]: { imponibile: number; imposta: number } } = {};
+    invoiceData.items.forEach(item => {
+      const imponibile = item.totalAmount / (1 + item.vatRate / 100);
+      const imposta = item.totalAmount - imponibile;
+      if (!ivaGroups[item.vatRate]) {
+        ivaGroups[item.vatRate] = { imponibile: 0, imposta: 0 };
+      }
+      ivaGroups[item.vatRate].imponibile += imponibile;
+      ivaGroups[item.vatRate].imposta += imposta;
+    });
+
+    let datiRiepilogo = '';
+    Object.keys(ivaGroups).forEach(aliquota => {
+      const key = Number(aliquota);
+      datiRiepilogo += `
+            <DatiRiepilogo>
+                <AliquotaIVA>${aliquota}</AliquotaIVA>
+                <ImponibileImporto>${ivaGroups[key].imponibile.toFixed(2)}</ImponibileImporto>
+                <Imposta>${ivaGroups[key].imposta.toFixed(2)}</Imposta>
+            </DatiRiepilogo>`;
+    });
+
+    // Nome cliente
+    const nomeCliente = invoiceData.customer.companyName || 
+                       `${invoiceData.customer.firstName} ${invoiceData.customer.lastName}`.trim();
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:FatturaElettronica versione="FPA12" 
+    xmlns:ds="http://www.w3.org/2000/09/xmldsig#" 
+    xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+    xsi:schemaLocation="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2 http://www.fatturapa.gov.it/export/fatturazione/sdi/fatturapa/v1.2/Schema_del_file_xml_FatturaPA_versione_1.2.xsd">
+    <FatturaElettronicaHeader>
+        <DatiTrasmissione>
+            <IdTrasmittente>
+                <IdPaese>IT</IdPaese>
+                <IdCodice>${supplierVatCode}</IdCodice>
+            </IdTrasmittente>
+            <ProgressivoInvio>${progressivoInvio}</ProgressivoInvio>
+            <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+            <CodiceDestinatario>${invoiceData.customer.sdiCode || '0000000'}</CodiceDestinatario>${invoiceData.customer.pec ? `\n            <PECDestinatario>${escapeXML(invoiceData.customer.pec)}</PECDestinatario>` : ''}
+        </DatiTrasmissione>
+        <CedentePrestatore>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>${supplierVatCode}</IdCodice>
+                </IdFiscaleIVA>
+                ${invoiceData.supplier.taxCode ? `<CodiceFiscale>${invoiceData.supplier.taxCode}</CodiceFiscale>` : ''}
+                <Anagrafica>
+                    <Denominazione>${escapeXML(invoiceData.supplier.companyName)}</Denominazione>
+                </Anagrafica>
+                <RegimeFiscale>RF01</RegimeFiscale>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>${escapeXML(invoiceData.supplier.address.addressLine1)}</Indirizzo>
+                <CAP>${invoiceData.supplier.address.postalCode}</CAP>
+                <Comune>${escapeXML(invoiceData.supplier.address.city)}</Comune>
+                <Provincia>${invoiceData.supplier.address.province}</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+        </CedentePrestatore>
+        <CessionarioCommittente>
+            <DatiAnagrafici>
+                ${customerVatCode ? `<IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>${customerVatCode}</IdCodice>
+                </IdFiscaleIVA>` : ''}
+                ${invoiceData.customer.taxCode ? `<CodiceFiscale>${invoiceData.customer.taxCode}</CodiceFiscale>` : ''}
+                <Anagrafica>
+                    <Denominazione>${escapeXML(nomeCliente)}</Denominazione>
+                </Anagrafica>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>${escapeXML(invoiceData.customer.address.addressLine1)}</Indirizzo>
+                <CAP>${invoiceData.customer.address.postalCode}</CAP>
+                <Comune>${escapeXML(invoiceData.customer.address.city)}</Comune>
+                <Provincia>${invoiceData.customer.address.province}</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+        </CessionarioCommittente>
+    </FatturaElettronicaHeader>
+    <FatturaElettronicaBody>
+        <DatiGenerali>
+            <DatiGeneraliDocumento>
+                <TipoDocumento>TD01</TipoDocumento>
+                <Divisa>EUR</Divisa>
+                <Data>${dataFattura}</Data>
+                <Numero>${escapeXML(invoiceData.number)}</Numero>
+            </DatiGeneraliDocumento>
+        </DatiGenerali>
+        <DatiBeniServizi>
+            ${dettaglioLinee}
+            ${datiRiepilogo}
+        </DatiBeniServizi>
+    </FatturaElettronicaBody>
+</p:FatturaElettronica>`;
+
+    return xml;
+  }
+
+  // Emetti fattura elettronica
+  async issueInvoice(invoiceData: InvoiceData): Promise<{ id: string; date: string }> {
+    const xmlPayload = this.generateFatturaXML(invoiceData);
+
+    const result = await this.makeRequestXML('/invoices', xmlPayload);
     return {
-      id: result.id,
+      id: result.data.uuid || result.id,
       date: result.date || new Date().toISOString(),
     };
   }
