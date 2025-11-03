@@ -64,7 +64,7 @@ export class OpenAPISDIClient {
   private token: string;
 
   constructor() {
-    this.baseUrl = process.env.OPENAPI_SDI_BASE_URL || 'https://api.openapi.it/sdi';
+    this.baseUrl = process.env.OPENAPI_SDI_BASE_URL || 'https://test.sdi.openapi.it';
     this.token = process.env.OPENAPI_SDI_TOKEN || '';
 
     if (!this.token) {
