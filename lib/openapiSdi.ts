@@ -68,14 +68,19 @@ export class OpenAPISDIClient {
     this.token = process.env.OPENAPI_SDI_TOKEN || '';
 
     if (!this.token) {
-      console.warn('OPENAPI_SDI_TOKEN non configurato, verrà utilizzato un mock');
+      console.warn('⚠️  OPENAPI_SDI_TOKEN non configurato - Modalità MOCK attiva');
+      console.warn('   Per usare API reale, configura OPENAPI_SDI_TOKEN su Vercel');
+    } else {
+      console.log('✅ OPENAPI_SDI_TOKEN configurato - Modalità PRODUCTION');
     }
   }
 
   private async makeRequest(endpoint: string, data: any): Promise<any> {
     // Mock mode se token non configurato
     if (!this.token) {
-      console.log('Mock mode OpenAPI SDI:', endpoint, data);
+      console.log('🎭 MOCK MODE OpenAPI SDI attivo');
+      console.log(`   Endpoint: ${endpoint}`);
+      console.log(`   Data: ${JSON.stringify(data).substring(0, 200)}...`);
       return {
         id: `MOCK-${Date.now()}`,
         date: new Date().toISOString(),
