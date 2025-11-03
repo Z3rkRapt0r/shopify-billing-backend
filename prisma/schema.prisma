@@ -81,6 +81,7 @@ enum InvoiceStatus {
   ERROR
   FOREIGN
   CORRISPETTIVO
+  CANCELLED
 }
 
 model CreditNote {

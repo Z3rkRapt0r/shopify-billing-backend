@@ -15,7 +15,7 @@ interface Order {
   totalPrice: number;
   createdAt: string;
   hasVatProfile: boolean;
-  invoiceStatus: 'PENDING' | 'ISSUED' | 'ERROR' | 'FOREIGN' | 'CORRISPETTIVO';
+  invoiceStatus: 'PENDING' | 'ISSUED' | 'ERROR' | 'FOREIGN' | 'CORRISPETTIVO' | 'CANCELLED';
   invoiceId?: string;
   invoiceDate?: string;
   lastError?: string;
@@ -240,6 +240,8 @@ export default function OrdersPage() {
         return <Badge variant="info">Estero</Badge>;
       case 'CORRISPETTIVO':
         return <Badge className="bg-gray-600">Corrispettivo</Badge>;
+      case 'CANCELLED':
+        return <Badge className="bg-red-800">Annullato</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -343,6 +345,12 @@ export default function OrdersPage() {
                   onClick={() => handleFilter('CORRISPETTIVO')}
                 >
                   Corrispettivi
+                </Button>
+                <Button
+                  variant={statusFilter === 'CANCELLED' ? 'default' : 'outline'}
+                  onClick={() => handleFilter('CANCELLED')}
+                >
+                  Annullati
                 </Button>
                 <Button
                   variant={statusFilter === null ? 'default' : 'outline'}
