@@ -94,6 +94,7 @@ export class OpenAPISDIClient {
       console.log(`📡 Chiamata OpenAPI SDI: ${endpoint}`);
       console.log(`   URL: ${url}`);
       console.log(`   Token configurato: ${this.token ? 'Sì (' + this.token.substring(0, 20) + '...)' : 'NO'}`);
+      console.log(`   Payload completo:`, JSON.stringify(data, null, 2));
       
       const response = await fetch(url, {
         method: 'POST',
@@ -231,8 +232,8 @@ export async function buildInvoiceData(orderId: string): Promise<InvoiceData | n
   }
 
   const supplierData: SupplierData = {
-    vatNumber: process.env.SUPPLIER_VAT_NUMBER || '',
-    taxCode: process.env.SUPPLIER_TAX_CODE || '',
+    vatNumber: (process.env.SUPPLIER_VAT_NUMBER || '').replace(/\n/g, '').trim(),
+    taxCode: (process.env.SUPPLIER_TAX_CODE || '').replace(/\n/g, '').trim(),
     companyName: 'La Tua Azienda SRL', // Da configurare
     address: {
       addressLine1: 'Via del Fornitore 1',
