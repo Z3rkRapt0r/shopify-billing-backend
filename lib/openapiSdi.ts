@@ -86,6 +86,10 @@ export class OpenAPISDIClient {
     const url = `${this.baseUrl}${endpoint}`;
     
     try {
+      console.log(`📡 Chiamata OpenAPI SDI: ${endpoint}`);
+      console.log(`   URL: ${url}`);
+      console.log(`   Token configurato: ${this.token ? 'Sì (' + this.token.substring(0, 20) + '...)' : 'NO'}`);
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -97,10 +101,14 @@ export class OpenAPISDIClient {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`❌ OpenAPI SDI Error: ${response.status} ${response.statusText}`);
+        console.error(`   Response body: ${errorText.substring(0, 500)}`);
         throw new Error(`OpenAPI SDI error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      return response.json();
+      const result = await response.json();
+      console.log(`✅ OpenAPI SDI Success: ${JSON.stringify(result).substring(0, 200)}...`);
+      return result;
     } catch (error) {
       console.error('Errore chiamata OpenAPI SDI:', error);
       throw error;

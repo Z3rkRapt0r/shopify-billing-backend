@@ -7,6 +7,8 @@ import { issueInvoiceSchema } from '@/lib/validators';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  let shopifyOrderId: string | undefined;
+  
   try {
     // Verifica autenticazione admin
     const adminPassword = process.env.ADMIN_PASSWORD;
@@ -17,7 +19,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { shopifyOrderId } = issueInvoiceSchema.parse(body);
+    const parsed = issueInvoiceSchema.parse(body);
+    shopifyOrderId = parsed.shopifyOrderId;
 
     // Trova l'ordine nel database
     const order = await prisma.orderSnapshot.findUnique({
@@ -112,19 +115,19 @@ export async function POST(request: NextRequest) {
     console.error('Error issuing invoice:', error);
     
     // Se abbiamo l'ID dell'ordine, aggiorna lo stato a ERROR
-    try {
-      const body = await request.clone().json();
-      const { shopifyOrderId } = issueInvoiceSchema.parse(body);
-      
-      await prisma.orderSnapshot.updateMany({
-        where: { shopifyOrderId },
-        data: {
-          invoiceStatus: 'ERROR',
-          lastError: error instanceof Error ? error.message : 'Unknown error',
-        },
-      });
-    } catch (updateError) {
-      console.error('Failed to update order error status:', updateError);
+    if (shopifyOrderId) {
+      try {
+        await prisma.orderSnapshot.updateMany({
+          where: { shopifyOrderId },
+          data: {
+            invoiceStatus: 'ERROR',
+            lastError: error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+        console.log(`Order ${shopifyOrderId} marked as ERROR`);
+      } catch (updateError) {
+        console.error('Failed to update order error status:', updateError);
+      }
     }
 
     return NextResponse.json(
