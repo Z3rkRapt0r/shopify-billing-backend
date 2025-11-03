@@ -98,6 +98,7 @@ export class OpenAPISDIClient {
       console.log(`📡 Chiamata OpenAPI SDI: ${endpoint}`);
       console.log(`   URL: ${url}`);
       console.log(`   Token configurato: ${this.token ? 'Sì (' + this.token.substring(0, 20) + '...)' : 'NO'}`);
+      console.log(`   Payload:`, JSON.stringify(data, null, 2).substring(0, 1000));
       
       const response = await fetch(url, {
         method: 'POST',
