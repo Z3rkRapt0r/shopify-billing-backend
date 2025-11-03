@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyShopifyWebhook, parseOrderWebhook } from '@/lib/shopify';
-import { orderSnapshotSchema } from '@/lib/validators';
+import { verifyShopifyWebhook, parseOrderWebhook, createShopifyClient, extractBillingDataFromMetafields, isBusinessCustomer } from '@/lib/shopify';
+import { orderSnapshotSchema, billingProfileSchema } from '@/lib/validators';
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,18 +43,75 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Determina stato per nuovo utente senza profilo
+      // 🎯 FIX: Recupera metafields da Shopify per nuovo utente
+      const shopifyClient = createShopifyClient();
+      let billingProfile: any = null;
+      let hasVatProfile = false;
+      
+      try {
+        console.log(`🔍 Recupero metafields per nuovo cliente ${webhookData.customer.id}`);
+        const metafieldsResponse = await shopifyClient.getCustomerMetafields(webhookData.customer.id);
+        const metafields = metafieldsResponse.metafields || [];
+        
+        const billingData = extractBillingDataFromMetafields(metafields);
+        const isBusiness = isBusinessCustomer(metafields);
+        
+        if (isBusiness && billingData) {
+          // Recupera indirizzo del cliente
+          const customerResponse = await shopifyClient.getCustomer(webhookData.customer.id);
+          const primaryAddress = customerResponse.customer?.addresses?.[0] as any;
+          
+          const billingProfileData = {
+            companyName: billingData.ragioneSociale || undefined,
+            vatNumber: billingData.partitaIva || undefined,
+            taxCode: billingData.codiceFiscale || undefined,
+            pec: undefined,
+            sdiCode: billingData.codiceSdi || undefined,
+            addressLine1: primaryAddress?.address1 || undefined,
+            addressLine2: primaryAddress?.address2 || undefined,
+            city: primaryAddress?.city || undefined,
+            province: primaryAddress?.province || undefined,
+            postalCode: primaryAddress?.zip || undefined,
+            countryCode: primaryAddress?.country_code || webhookData.billing_address?.country_code || 'IT',
+            isBusiness: true,
+          };
+          
+          const validationResult = billingProfileSchema.safeParse(billingProfileData);
+          
+          if (validationResult.success) {
+            billingProfile = await prisma.billingProfile.create({
+              data: {
+                userId: newUser.id,
+                ...validationResult.data,
+              },
+            });
+            
+            const billingCountryCode = webhookData.billing_address?.country_code;
+            hasVatProfile = billingCountryCode === 'IT' && !!(billingProfile.vatNumber || billingProfile.taxCode);
+            
+            console.log(`✅ Profilo Business creato per nuovo cliente ${webhookData.customer.email}`);
+          }
+        } else {
+          console.log(`ℹ️  Nuovo cliente ${webhookData.customer.email} NON è Business`);
+        }
+      } catch (error) {
+        console.error(`⚠️  Errore recupero metafields per nuovo cliente:`, error);
+        // Continua senza profilo
+      }
+
+      // Determina stato per nuovo utente
       const billingCountryCode = webhookData.billing_address?.country_code;
       let invoiceStatus: 'PENDING' | 'FOREIGN' | 'CORRISPETTIVO' = 'PENDING';
       
       if (billingCountryCode && billingCountryCode !== 'IT') {
         invoiceStatus = 'FOREIGN';
+      } else if (hasVatProfile && billingCountryCode === 'IT') {
+        invoiceStatus = 'PENDING';
       } else if (billingCountryCode === 'IT') {
-        // Nuovo utente italiano senza profilo → CORRISPETTIVO
         invoiceStatus = 'CORRISPETTIVO';
       }
 
-      // Crea l'ordine senza profilo fatturazione
+      // Crea l'ordine
       const orderData = {
         userId: newUser.id,
         shopifyOrderId: webhookData.id,
@@ -59,16 +119,31 @@ export async function POST(request: NextRequest) {
         currency: webhookData.currency,
         totalPrice: webhookData.total_price,
         shopifyCreatedAt: webhookData.created_at,
-        hasVatProfile: false,
+        hasVatProfile,
         invoiceStatus,
       };
 
       const validatedOrderData = orderSnapshotSchema.parse(orderData);
-      await prisma.orderSnapshot.create({
+      const createdOrder = await prisma.orderSnapshot.create({
         data: validatedOrderData,
       });
 
-      console.log(`Order ${webhookData.id} created for new user`);
+      // Se l'ordine è Business, aggiungilo alla coda
+      if (hasVatProfile && invoiceStatus === 'PENDING') {
+        await prisma.queueJob.create({
+          data: {
+            type: 'invoice',
+            payload: {
+              shopifyOrderId: webhookData.id,
+            },
+            status: 'PENDING',
+            scheduledAt: new Date(),
+          },
+        });
+        console.log(`📋 Ordine ${webhookData.id} aggiunto alla coda per emissione fattura`);
+      }
+
+      console.log(`Order ${webhookData.id} created for new user. Status: ${invoiceStatus}, Has VAT: ${hasVatProfile}`);
       return NextResponse.json({ success: true });
     }
 
