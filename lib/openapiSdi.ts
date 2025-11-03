@@ -161,7 +161,7 @@ export class OpenAPISDIClient {
       },
     };
 
-    const result = await this.makeRequest('/supplier-invoice', payload);
+    const result = await this.makeRequest('/invoices', payload);
     return {
       id: result.id,
       date: result.date || new Date().toISOString(),
