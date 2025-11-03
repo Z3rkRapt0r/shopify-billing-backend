@@ -62,28 +62,26 @@ export interface CreditNoteData extends Omit<InvoiceData, 'number'> {
 export class OpenAPISDIClient {
   private baseUrl: string;
   private token: string;
-  private apiKey: string;
 
   constructor() {
     const baseUrl = process.env.OPENAPI_SDI_BASE_URL || 'https://test.sdi.openapi.it';
     // Assicurati che l'URL abbia il protocollo
     this.baseUrl = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
     this.token = process.env.OPENAPI_SDI_TOKEN || '';
-    this.apiKey = process.env.OPENAPI_SDI_API_KEY || '';
 
-    console.log(`🔧 OpenAPI SDI Configurato: baseUrl=${this.baseUrl}, token=${this.token ? 'Configurato' : 'NO'}, apiKey=${this.apiKey ? 'Configurato' : 'NO'}`);
+    console.log(`🔧 OpenAPI SDI Configurato: baseUrl=${this.baseUrl}, token=${this.token ? 'Configurato' : 'NO'}`);
 
-    if (!this.token || !this.apiKey) {
-      console.warn('⚠️  OPENAPI_SDI_TOKEN o OPENAPI_SDI_API_KEY non configurato - Modalità MOCK attiva');
-      console.warn('   Per usare API reale, configura entrambi su Vercel');
+    if (!this.token) {
+      console.warn('⚠️  OPENAPI_SDI_TOKEN non configurato - Modalità MOCK attiva');
+      console.warn('   Per usare API reale, configura OPENAPI_SDI_TOKEN su Vercel');
     } else {
-      console.log('✅ OPENAPI_SDI_TOKEN e OPENAPI_SDI_API_KEY configurati - Modalità PRODUCTION');
+      console.log('✅ OPENAPI_SDI_TOKEN configurato - Modalità PRODUCTION');
     }
   }
 
   private async makeRequest(endpoint: string, data: any): Promise<any> {
-    // Mock mode se token o apiKey non configurati
-    if (!this.token || !this.apiKey) {
+    // Mock mode se token non configurato
+    if (!this.token) {
       console.log('🎭 MOCK MODE OpenAPI SDI attivo');
       console.log(`   Endpoint: ${endpoint}`);
       console.log(`   Data: ${JSON.stringify(data).substring(0, 200)}...`);
@@ -100,22 +98,14 @@ export class OpenAPISDIClient {
       console.log(`📡 Chiamata OpenAPI SDI: ${endpoint}`);
       console.log(`   URL: ${url}`);
       console.log(`   Token configurato: ${this.token ? 'Sì (' + this.token.substring(0, 20) + '...)' : 'NO'}`);
-      console.log(`   API Key configurata: ${this.apiKey ? 'Sì (' + this.apiKey.substring(0, 20) + '...)' : 'NO'}`);
       console.log(`   Payload:`, JSON.stringify(data, null, 2).substring(0, 1000));
-      
-      const headers: any = {
-        'Authorization': `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      };
-      
-      // Aggiungi API Key se disponibile
-      if (this.apiKey) {
-        headers['X-API-Key'] = this.apiKey;
-      }
       
       const response = await fetch(url, {
         method: 'POST',
-        headers,
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(data),
       });
 
